@@ -336,7 +336,7 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: no GPS → error shown, API not called; valid submission → confirmation shown
     - _Requirements: 12.1, 12.3_
 
-- [ ] 18. Final checkpoint — full stack
+- [x] 18. Final checkpoint — full stack
   - Ensure all backend and frontend tests pass. Verify `GET /health` returns ingestion status, the tab router guards unauthenticated access, the check-in flow returns both individual and building points, the Credits Dashboard displays redemption tiers, and the Map tab shows the live stats overlay and underserved shading. Ask the user if questions arise.
 
 ## Notes
