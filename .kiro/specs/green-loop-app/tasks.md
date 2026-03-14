@@ -326,8 +326,8 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: insufficient balance → 422 shows current and required balance; success → updated balance displayed
     - _Requirements: 13.5, 13.7_
 
-- [ ] 17. Frontend: Bin Request form
-  - [ ] 17.1 Implement `BinRequestForm` component (modal/sheet)
+- [x] 17. Frontend: Bin Request form
+  - [x] 17.1 Implement `BinRequestForm` component (modal/sheet)
     - Capture GPS automatically; optional description text input
     - On submit: call `POST /bin-requests`; show confirmation on success
     - Accessible from Map_Tab toolbar and Dashboard_Tab
