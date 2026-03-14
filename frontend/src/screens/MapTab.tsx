@@ -27,6 +27,12 @@ const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
   'Yuen Long': [114.0228, 22.4447],
 };
 
+// HK bounding box — prevents panning outside Hong Kong
+const HK_BOUNDS: [[number, number], [number, number]] = [
+  [113.7, 22.1], // SW
+  [114.5, 22.6], // NE
+];
+
 const DEFAULT_CENTER: [number, number] = [114.1694, 22.3193]; // HK centre
 
 interface CollectionPoint {
@@ -62,6 +68,7 @@ export default function MapTab() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('mapbox-gl').Map | null>(null);
   const markersRef = useRef<import('mapbox-gl').Marker[]>([]);
+  const userMarkerRef = useRef<import('mapbox-gl').Marker | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const navState = location.state as { centerLat?: number; centerLng?: number } | null;
@@ -87,7 +94,7 @@ export default function MapTab() {
           const centroid = district ? DISTRICT_CENTROIDS[district] : undefined;
           resolve(centroid ?? DEFAULT_CENTER);
         },
-        { timeout: 5000 },
+        { timeout: 5000, maximumAge: 60000 },
       );
     });
   }
@@ -249,7 +256,9 @@ export default function MapTab() {
         const mapboxgl = (await import('mapbox-gl')).default;
         await import('mapbox-gl/dist/mapbox-gl.css');
 
-        mapboxgl.accessToken = (import.meta.env['VITE_MAPBOX_TOKEN'] as string) ?? '';
+        mapboxgl.accessToken = (import.meta.env['VITE_MAPBOX_TOKEN'] as string)
+          || localStorage.getItem('mapbox_token')
+          || '';
 
         if (!mapContainerRef.current || destroyed) return;
 
@@ -263,9 +272,31 @@ export default function MapTab() {
           zoom: navState?.centerLat != null ? 15 : 12,
           pitch: 45,
           bearing: -17.6,
+          maxBounds: HK_BOUNDS,
         });
 
         mapRef.current = map;
+
+        // User location marker (blue dot with red border)
+        const userEl = document.createElement('div');
+        userEl.style.cssText = `
+          width: 16px; height: 16px; border-radius: 50%;
+          background: #ef4444; border: 3px solid #fff;
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.35);
+        `;
+        userMarkerRef.current = new mapboxgl.Marker({ element: userEl })
+          .setLngLat(center)
+          .addTo(map);
+
+        // Watch position and update marker
+        const watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const lngLat: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+            userMarkerRef.current?.setLngLat(lngLat);
+          },
+          () => { /* ignore — marker stays at initial center */ },
+          { maximumAge: 30000, timeout: 10000 },
+        );
 
         map.on('load', () => {
           if (!map || destroyed) return;
@@ -317,19 +348,28 @@ export default function MapTab() {
           void fetchUnderservedAreas(map);
         });
 
-        // Debounced handler for pan/zoom
+        // Debounced handler for pan/zoom — only refetch if moved >300m
+        let lastFetchCenter = map.getCenter();
         const onMoveEnd = debounce(() => {
           if (!map || destroyed) return;
+          const center = map.getCenter();
+          const dLat = Math.abs(center.lat - lastFetchCenter.lat);
+          const dLng = Math.abs(center.lng - lastFetchCenter.lng);
+          // ~0.003 degrees ≈ 300m — skip if barely moved
+          if (dLat < 0.003 && dLng < 0.003) return;
+          lastFetchCenter = center;
           const bounds = map.getBounds();
-          const mapCenter = map.getCenter();
-          void fetchCollectionPoints(map, mapCenter.lat, mapCenter.lng);
+          void fetchCollectionPoints(map, center.lat, center.lng);
           if (bounds) {
             void fetchGarbageReports(map, bounds);
             void fetchStats(bounds);
           }
-        }, 400);
+        }, 800);
 
         map.on('moveend', onMoveEnd);
+
+        // Store watchId for cleanup
+        (map as unknown as { _watchId?: number })._watchId = watchId;
       } catch {
         if (!destroyed) setMapError('Map failed to load');
       }
@@ -339,6 +379,10 @@ export default function MapTab() {
 
     return () => {
       destroyed = true;
+      const watchId = (map as unknown as { _watchId?: number })?._watchId;
+      if (watchId != null) navigator.geolocation.clearWatch(watchId);
+      userMarkerRef.current?.remove();
+      userMarkerRef.current = null;
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
       map?.remove();
@@ -392,7 +436,7 @@ export default function MapTab() {
         setCheckinMsg('📍 Location unavailable. Enable GPS to check in.');
         setCheckingIn(false);
       },
-      { timeout: 8000 },
+      { timeout: 8000, maximumAge: 30000 },
     );
   }
 

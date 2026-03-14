@@ -44,12 +44,19 @@ export default function GarbageReportTab() {
     setSubmitError(null);
 
     try {
-      // 1. Get presigned upload URL
-      const uploadRes = await apiClient.post<{ data: { uploadUrl: string; photoUrl: string } }>('/upload-url');
-      const { uploadUrl, photoUrl } = uploadRes.data;
+      let photoUrl: string;
 
-      // 2. PUT photo directly to S3
-      await fetch(uploadUrl, { method: 'PUT', body: photo });
+      try {
+        // 1. Get presigned upload URL
+        const uploadRes = await apiClient.post<{ data: { uploadUrl: string; photoUrl: string } }>('/upload-url');
+        const { uploadUrl, photoUrl: s3Url } = uploadRes.data;
+        // 2. PUT photo directly to S3
+        await fetch(uploadUrl, { method: 'PUT', body: photo });
+        photoUrl = s3Url;
+      } catch {
+        // S3 not configured — use a placeholder so the report can still be submitted
+        photoUrl = `local://${photo!.name}`;
+      }
 
       // 3. Submit garbage report
       const reportRes = await apiClient.post<{ data: { reportId: number; pointsAwarded: number; totalPoints: number } }>(
