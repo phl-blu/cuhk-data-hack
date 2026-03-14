@@ -1,0 +1,99 @@
+import { Router } from 'express';
+import { authMiddleware } from '../middleware/auth.js';
+import { sendSuccess } from '../lib/response.js';
+import { upsertResident, getPointsHistory } from '../services/points.js';
+import pool from '../db/pool.js';
+
+const router = Router();
+
+// GET /residents/me
+router.get('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const resident = req.resident!;
+
+    // Ensure resident exists
+    await upsertResident(resident.residentId, resident.displayName, resident.district);
+
+    // Query resident profile
+    const profileResult = await pool.query<{
+      id: string;
+      display_name: string;
+      total_points: number;
+      checkin_count: number;
+      report_count: number;
+      district_name: string | null;
+    }>(
+      `SELECT
+         r.id,
+         r.display_name,
+         r.total_points,
+         r.checkin_count,
+         r.report_count,
+         d.name AS district_name
+       FROM residents r
+       LEFT JOIN districts d ON d.id = r.district_id
+       WHERE r.id = $1`,
+      [resident.residentId]
+    );
+
+    const profile = profileResult.rows[0];
+    if (!profile) {
+      sendSuccess(res, {
+        residentId: resident.residentId,
+        displayName: resident.displayName,
+        district: resident.district,
+        totalPoints: 0,
+        checkinCount: 0,
+        reportCount: 0,
+        districtRank: null,
+      });
+      return;
+    }
+
+    // Compute district rank: count of districts with higher points_per_km2 + 1
+    const rankResult = await pool.query<{ rank: string }>(
+      `WITH my_district AS (
+         SELECT dp.total_points::double precision / NULLIF(d.area_km2, 0) AS ppm
+         FROM residents r
+         JOIN districts d ON d.id = r.district_id
+         LEFT JOIN district_points dp ON dp.district_id = d.id
+         WHERE r.id = $1
+       )
+       SELECT COUNT(*) + 1 AS rank
+       FROM districts d
+       LEFT JOIN district_points dp ON dp.district_id = d.id
+       WHERE dp.total_points::double precision / NULLIF(d.area_km2, 0) > (SELECT ppm FROM my_district)`,
+      [resident.residentId]
+    );
+
+    const districtRank = rankResult.rows[0] ? Number(rankResult.rows[0].rank) : null;
+
+    sendSuccess(res, {
+      residentId: profile.id,
+      displayName: profile.display_name,
+      district: profile.district_name ?? resident.district,
+      totalPoints: profile.total_points,
+      checkinCount: profile.checkin_count,
+      reportCount: profile.report_count,
+      districtRank,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /residents/me/points
+router.get('/me/points', authMiddleware, async (req, res, next) => {
+  try {
+    const resident = req.resident!;
+
+    const history = await getPointsHistory(resident.residentId);
+    const transactions = history.slice(0, 20);
+
+    sendSuccess(res, { transactions });
+  } catch (err) {
+    next(err);
+  }
+});
+
+export default router;
