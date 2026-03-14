@@ -288,8 +288,8 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: 409 shows retry message; 422 shows distance message; 401 clears session and redirects
     - _Requirements: 7.4, 7.5, 7.6_
 
-- [ ] 14. Frontend: Garbage Report tab
-  - [ ] 14.1 Implement `GarbageReportTab` component
+- [x] 14. Frontend: Garbage Report tab
+  - [x] 14.1 Implement `GarbageReportTab` component
     - Capture GPS via `navigator.geolocation.getCurrentPosition`; block submission if unavailable
     - File input (`accept="image/*"`) required before submit; block and show error if missing
     - On submit: obtain pre-signed URL from `POST /upload-url`; PUT photo to S3; call `POST /garbage-reports` with returned `photoUrl` and coords

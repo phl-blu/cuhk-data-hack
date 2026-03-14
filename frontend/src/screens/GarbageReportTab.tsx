@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { apiClient } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+import { apiClient, ApiError } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 
 export default function GarbageReportTab() {
+  const navigate = useNavigate();
+  const { clearSession } = useAuth();
+
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
-  const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<{ photo?: string; gps?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<{ pointsAwarded: number } | null>(null);
@@ -44,21 +48,34 @@ export default function GarbageReportTab() {
       const uploadRes = await apiClient.post<{ data: { uploadUrl: string; photoUrl: string } }>('/upload-url');
       const { uploadUrl, photoUrl } = uploadRes.data;
 
-      // 2. PUT photo directly to storage
+      // 2. PUT photo directly to S3
       await fetch(uploadUrl, { method: 'PUT', body: photo });
 
-      // 3. Submit report
-      const reportRes = await apiClient.post<{ data: { reportId: number; pointsAwarded: number } }>(
+      // 3. Submit garbage report
+      const reportRes = await apiClient.post<{ data: { reportId: number; pointsAwarded: number; totalPoints: number } }>(
         '/garbage-reports',
-        { lat, lng, photoUrl, description: description || undefined },
+        { lat, lng, photoUrl },
       );
 
       setSuccess({ pointsAwarded: reportRes.data.pointsAwarded });
       setPhoto(null);
-      setDescription('');
       if (fileRef.current) fileRef.current.value = '';
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Submission failed');
+      if (e instanceof ApiError) {
+        if (e.status === 401) {
+          clearSession();
+          navigate('/onboarding');
+          return;
+        }
+        if (e.status === 400) {
+          const field = typeof e.data['field'] === 'string' ? e.data['field'] : undefined;
+          setSubmitError(field ? `${field}: ${e.message}` : e.message);
+        } else {
+          setSubmitError('Something went wrong. Please try again.');
+        }
+      } else {
+        setSubmitError('Something went wrong. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -113,19 +130,6 @@ export default function GarbageReportTab() {
               Selected: {photo.name}
             </p>
           )}
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-            Description (optional)
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe the issue…"
-            rows={3}
-            style={{ resize: 'vertical' }}
-          />
         </div>
 
         {errors.gps && <p className="error-text">{errors.gps}</p>}
