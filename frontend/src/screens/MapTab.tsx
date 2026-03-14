@@ -17,6 +17,20 @@ export function getFillCategory(pct: number): { label: string; color: string } {
   return           { label: 'Full',   color: '#dc2626' };
 }
 
+// Fallback collection points — shown when DB is empty or API unreachable
+const FALLBACK_POINTS: CollectionPoint[] = [
+  { id: 1,  name: 'Wan Chai Recycling Station',       accessTier: 'basic',   materials: ['Paper','Plastic','Metal'], lat: 22.2783, lng: 114.1825, distanceMetres: 200 },
+  { id: 2,  name: 'Causeway Bay Green Corner',         accessTier: 'basic',   materials: ['Paper','Glass'],           lat: 22.2800, lng: 114.1840, distanceMetres: 350 },
+  { id: 3,  name: 'Mong Kok Eco Point',                accessTier: 'premium', materials: ['E-Waste','Clothing'],      lat: 22.3193, lng: 114.1694, distanceMetres: 500 },
+  { id: 4,  name: 'Tsim Sha Tsui Collection Hub',      accessTier: 'basic',   materials: ['Paper','Plastic'],         lat: 22.2988, lng: 114.1722, distanceMetres: 600 },
+  { id: 5,  name: 'Sha Tin Recycling Centre',          accessTier: 'premium', materials: ['Metal','Glass','E-Waste'], lat: 22.3830, lng: 114.1952, distanceMetres: 800 },
+  { id: 6,  name: 'Kwun Tong Green Station',           accessTier: 'basic',   materials: ['Paper','Plastic','Metal'], lat: 22.3130, lng: 114.2262, distanceMetres: 900 },
+  { id: 7,  name: 'Sham Shui Po Eco Corner',           accessTier: 'basic',   materials: ['Clothing','Paper'],        lat: 22.3302, lng: 114.1618, distanceMetres: 1100 },
+  { id: 8,  name: 'Central Recycling Drop-off',        accessTier: 'premium', materials: ['Paper','Glass','Plastic'], lat: 22.2855, lng: 114.1549, distanceMetres: 1200 },
+  { id: 9,  name: 'Tuen Mun Green Point',              accessTier: 'basic',   materials: ['Plastic','Metal'],         lat: 22.3914, lng: 113.9769, distanceMetres: 1500 },
+  { id: 10, name: 'Yuen Long Eco Station',             accessTier: 'basic',   materials: ['Paper','Plastic'],         lat: 22.4447, lng: 114.0228, distanceMetres: 1800 },
+];
+
 // District centroids for fallback when geolocation is unavailable
 const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
   'Central and Western': [114.1549, 22.2855],
@@ -130,10 +144,20 @@ export default function MapTab() {
   ) => {
     try {
       const mapboxgl = (await import('mapbox-gl')).default;
-      const res = await apiClient.get<{ data: { points: CollectionPoint[] } }>(
-        `/collection-points/nearby?lat=${lat}&lng=${lng}&radius=5000`,
-      );
-      const points: CollectionPoint[] = res.data.points ?? [];
+      let points: CollectionPoint[] = [];
+      try {
+        const res = await apiClient.get<{ data: { points: CollectionPoint[] } }>(
+          `/collection-points/nearby?lat=${lat}&lng=${lng}&radius=5000`,
+        );
+        points = res.data.points ?? [];
+      } catch {
+        // API unreachable — fall through to fallback
+      }
+
+      // Use fallback if DB is empty or API failed
+      if (points.length === 0) {
+        points = FALLBACK_POINTS;
+      }
 
       // Remove old CP markers
       markersRef.current = markersRef.current.filter((m) => {
