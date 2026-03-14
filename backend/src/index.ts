@@ -2,7 +2,7 @@ import express from 'express';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import pool from './db/pool.js';
-import { startScheduler } from './ingestion/scheduler.js';
+import { startScheduler, runIngestion } from './ingestion/scheduler.js';
 import checkinsRouter from './routes/checkins.js';
 import garbageReportsRouter from './routes/garbageReports.js';
 import collectionPointsRouter from './routes/collectionPoints.js';
@@ -18,6 +18,18 @@ const app = express();
 
 app.use(express.json());
 app.use(requestIdMiddleware);
+
+app.post('/admin/ingest', async (_req, res) => {
+  try {
+    await runIngestion();
+    const result = await pool.query(
+      `SELECT dataset_name, last_ingested, record_count, status FROM dataset_ingestion_status`
+    );
+    res.json({ data: { triggered: true, datasets: result.rows } });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
 
 app.get('/health', async (_req, res) => {
   try {
