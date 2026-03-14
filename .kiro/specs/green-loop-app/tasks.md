@@ -299,8 +299,8 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: no photo → error shown, API not called; no GPS → error shown, API not called
     - _Requirements: 6.2, 6.7, 6.8_
 
-- [ ] 15. Frontend: Profile tab
-  - [ ] 15.1 Implement `ProfileTab` component
+- [x] 15. Frontend: Profile tab
+  - [x] 15.1 Implement `ProfileTab` component
     - Display display name, district, total points, check-in count, report count, district rank
     - Fetch `GET /residents/me/points`; show most recent 20 transactions (type, individual_points, building_points, timestamp)
     - "Sign Out" button calls `clearSession()` and redirects to `/onboarding`
