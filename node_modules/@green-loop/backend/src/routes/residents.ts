@@ -82,6 +82,17 @@ router.get('/me', authMiddleware, async (req, res, next) => {
     );
     const raRow = raResult.rows[0];
 
+    // Monthly counts (current calendar month)
+    const monthlyResult = await pool.query<{ monthly_checkins: string; monthly_reports: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM checkins WHERE resident_id = $1
+            AND created_at >= date_trunc('month', NOW())) AS monthly_checkins,
+         (SELECT COUNT(*) FROM garbage_reports WHERE resident_id = $1
+            AND created_at >= date_trunc('month', NOW())) AS monthly_reports`,
+      [resident.residentId]
+    );
+    const monthly = monthlyResult.rows[0];
+
     sendSuccess(res, {
       residentId: profile.id,
       displayName: profile.display_name,
@@ -89,6 +100,8 @@ router.get('/me', authMiddleware, async (req, res, next) => {
       totalPoints: profile.total_points,
       checkinCount: profile.checkin_count,
       reportCount: profile.report_count,
+      monthlyCheckinCount: monthly ? Number(monthly.monthly_checkins) : 0,
+      monthlyReportCount: monthly ? Number(monthly.monthly_reports) : 0,
       districtRank,
       residentialAreaName: raRow?.residential_area_name ?? null,
       residentialAreaBuildingPoints: raRow ? Number(raRow.building_points) : 0,

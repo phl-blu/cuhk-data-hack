@@ -225,8 +225,8 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Guard: redirect to `/onboarding` if no session
     - _Requirements: 1.4, 13.1_
 
-- [ ] 10. Frontend: onboarding screen
-  - [ ] 10.1 Implement `OnboardingScreen` component
+- [x] 10. Frontend: onboarding screen
+  - [x] 10.1 Implement `OnboardingScreen` component
     - Display name text input (1–50 chars) and district `<select>` with all 18 HK districts
     - On submit: validate both fields; call `createSession`; navigate to `/`
     - Show field-level validation errors for empty name or no district selected
@@ -238,8 +238,8 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: valid submission creates session and navigates; empty name shows error; no district shows error
     - _Requirements: 1.1, 1.2, 1.5_
 
-- [ ] 11. Frontend: Leaderboard tab
-  - [ ] 11.1 Implement `LeaderboardTab` component
+- [x] 11. Frontend: Leaderboard tab
+  - [x] 11.1 Implement `LeaderboardTab` component
     - Fetch `GET /leaderboard` on mount; display ranked list with district name, points/km², rank
     - Top-3 entries visually distinguished (e.g. gold/silver/bronze styling)
     - Highlight the resident's own district row
@@ -249,8 +249,8 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: own district highlighted; top-3 have distinct style; loading state shown
     - _Requirements: 3.4, 3.5, 3.6_
 
-- [ ] 12. Frontend: Dashboard tab
-  - [ ] 12.1 Implement `DashboardTab` component
+- [x] 12. Frontend: Dashboard tab
+  - [x] 12.1 Implement `DashboardTab` component
     - Fetch `GET /residents/me` and `GET /collection-points/nearby` (using device location or district centroid fallback)
     - Display: district, total points, leaderboard rank, nearest collection point (name, tier, distance), monthly check-in and report counts
     - "Go to Map" button navigates to `/map` centered on nearest point

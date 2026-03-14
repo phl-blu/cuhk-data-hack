@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import BinRequestModal from './BinRequestModal';
@@ -28,6 +28,8 @@ export default function MapTab() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = location.state as { centerLat?: number; centerLng?: number } | null;
   const { clearSession } = useAuth();
   const [stats, setStats] = useState<MapStats | null>(null);
   const [popup, setPopup] = useState<PopupInfo | null>(null);
@@ -50,8 +52,10 @@ export default function MapTab() {
         map = new mapboxgl.Map({
           container: mapContainerRef.current,
           style: 'mapbox://styles/mapbox/streets-v12',
-          center: [114.1694, 22.3193],
-          zoom: 11,
+          center: navState?.centerLng != null && navState?.centerLat != null
+            ? [navState.centerLng, navState.centerLat]
+            : [114.1694, 22.3193],
+          zoom: navState?.centerLat != null ? 15 : 11,
           pitch: 45,
           bearing: -17.6,
         });
