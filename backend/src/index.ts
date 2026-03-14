@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express from 'express';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';

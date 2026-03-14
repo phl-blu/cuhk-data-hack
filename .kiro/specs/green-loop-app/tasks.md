@@ -196,18 +196,18 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - **Property 30: Residential area leaderboard ordering**
     - **Validates: Requirements 14.5**
 
-- [ ] 8. Checkpoint — backend
+- [x] 8. Checkpoint — backend
   - Ensure all backend tests pass and `GET /health` returns 200 with ingestion status. Ask the user if questions arise.
 
 
-- [ ] 9. Frontend: project setup and shell
-  - [ ] 9.1 Initialise `frontend/` as a React/Vite/TypeScript project
+- [x] 9. Frontend: project setup and shell
+  - [x] 9.1 Initialise `frontend/` as a React/Vite/TypeScript project
     - `npm create vite@latest frontend -- --template react-ts`
     - Install: `react-router-dom`, `mapbox-gl`, `fast-check`, `@testing-library/react`, `vitest`
     - Configure `vite.config.ts` with proxy to backend dev server
     - Add mobile-first base CSS (viewport meta, `100dvh` layout, touch-action)
     - _Requirements: 5.7_
-  - [ ] 9.2 Implement `AuthProvider` and `LocalStorageAuthProvider`
+  - [x] 9.2 Implement `AuthProvider` and `LocalStorageAuthProvider`
     - Define `AuthProvider` interface and `Session` type matching design
     - `LocalStorageAuthProvider`: `getSession`, `createSession`, `clearSession`, `getSessionToken`
     - Export `AuthContext` and `useAuth` hook; wrap app in `<AuthProvider>`
@@ -219,7 +219,7 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
   - [ ]* 9.4 Write property test for sign-out clears session
     - **Property 3: Sign-out clears session**
     - **Validates: Requirements 1.6, 10.5**
-  - [ ] 9.5 Implement tab router with six routes
+  - [x] 9.5 Implement tab router with six routes
     - `react-router-dom` `<Routes>`: `/` → Leaderboard, `/dashboard` → Dashboard, `/map` → Map, `/report` → GarbageReport, `/credits` → Credits, `/profile` → Profile
     - Bottom tab bar component with active-state styling
     - Guard: redirect to `/onboarding` if no session

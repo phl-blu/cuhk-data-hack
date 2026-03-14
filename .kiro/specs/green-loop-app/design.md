@@ -2,7 +2,7 @@
 
 ## Overview
 
-Green Loop is a gamified civic recycling app for Hong Kong residents. Residents earn Points by checking in at recycling Collection Points and reporting misplaced garbage. Points aggregate at the District level to drive a per-area leaderboard across Hong Kong's 18 administrative districts, ranked by Points per km² of district land area.
+Green Loop is a gamified civic recycling app for Hong Kong residents. Residents earn Points by checking in at recycling Collection Points and reporting misplaced garbage. Points aggregate at the District level to drive a per-area leaderboard across Hong Kong's 18 administrative districts, ranked by Points per km² of district land area. Every recycling action simultaneously awards Individual_Points to the resident and Building_Points to their Residential_Area. Individual_Points are redeemable for Octopus card top-ups via the Credits Dashboard tab.
 
 This is a hackathon prototype. The stack is chosen for speed of development while keeping the architecture clean enough that production concerns (real auth, cloud storage, CI/CD) can be layered in without restructuring.
 
@@ -27,6 +27,7 @@ graph TD
         D[Map Tab]
         E[Garbage Report Tab]
         F[Profile Tab]
+        CR[Credits Dashboard Tab]
         G[AuthProvider - localStorage]
     end
 
@@ -37,6 +38,8 @@ graph TD
         K[Spatial Service - PostGIS]
         L[Points Service]
         M[Photo Upload Handler]
+        RA[Residential Area Service]
+        RD[Redemption Service]
     end
 
     subgraph Storage
@@ -54,8 +57,12 @@ graph TD
     H --> K
     H --> L
     H --> M
+    H --> RA
+    H --> RD
     K --> N
     L --> N
+    RA --> N
+    RD --> N
     M --> O
     J -->|24h schedule| P
     J --> N
@@ -66,8 +73,8 @@ graph TD
 1. Frontend sends `POST /checkins` with `{ residentId, collectionPointId, lat, lng }` and `X-Session-Token` header.
 2. Auth middleware validates the session token (prototype: base64 of `displayName:district`).
 3. Points Service verifies proximity (≤200 m via PostGIS `ST_Distance`) and 60-minute duplicate window.
-4. Points are recorded; district aggregate is updated in the same transaction.
-5. Response returns awarded points and new total.
+4. Points Service awards Individual_Points to the resident and Building_Points to their Residential_Area atomically; applies 1.5× bonus if Premium_Access + Underserved_Area.
+5. Response returns awarded individual points, building points, and new total.
 
 ---
 
@@ -102,16 +109,20 @@ interface Session {
 |-----|-------|-------------------|
 | Leaderboard | `/` | `GET /leaderboard` |
 | Dashboard | `/dashboard` | `GET /residents/me`, `GET /collection-points/nearby` |
-| Map | `/map` | `GET /collection-points/nearby`, `GET /garbage-reports` |
+| Map | `/map` | `GET /collection-points/nearby`, `GET /garbage-reports`, `GET /map/stats`, `GET /collection-points/underserved` |
 | Garbage Report | `/report` | `POST /garbage-reports` |
+| Credits | `/credits` | `GET /residents/me`, `GET /credits/redemptions`, `POST /credits/redeem`, `GET /residential-areas/leaderboard` |
 | Profile | `/profile` | `GET /residents/me`, `GET /residents/me/points` |
 
 #### MapView
 
 - Mapbox GL JS instance, 3D pitch enabled when WebGL is available.
 - Two marker layers: `collection-points` (blue = basic, green = premium) and `garbage-reports` (red).
-- On marker tap: opens a bottom sheet with detail panel and Check-In button.
+- Underserved_Area fill layer rendered from `GET /collection-points/underserved`.
+- Live statistics overlay panel updated on viewport change via `GET /map/stats`.
+- On marker tap: opens a bottom sheet with detail panel, Check-In button, and Get Directions button.
 - On pan/zoom: debounced fetch to `GET /collection-points/nearby` with new map center.
+- "Request a Bin" button in map toolbar, visible at all zoom levels.
 
 #### GarbageReportForm
 
@@ -141,10 +152,12 @@ Swapping to iamSmart means replacing this function only — all route handlers u
 #### Points Service
 
 Responsibilities:
-- Award points for check-ins and garbage reports.
+- Award Individual_Points for check-ins and garbage reports; simultaneously award equal Building_Points to the resident's Residential_Area in the same atomic transaction.
+- Apply 1.5× bonus multiplier for check-ins at Premium_Access Collection_Points located in Underserved_Areas.
+- Apply a 10-point deduction to the next Redemption if the resident's balance falls below 50 after a Redemption.
 - Enforce 60-minute duplicate check-in window per `(residentId, collectionPointId)`.
 - Update district aggregate atomically with the points transaction.
-- Return points history ordered by timestamp descending.
+- Return points history ordered by timestamp descending, including both individual_points and building_points per transaction.
 
 #### Spatial Service
 
@@ -152,6 +165,7 @@ Wraps PostGIS queries:
 - `findNearby(lat, lng, radiusMetres)` → `ST_DWithin` query, returns distance via `ST_Distance`.
 - `pointInDistrict(lat, lng)` → `ST_Contains` against district boundary polygons.
 - `findInBoundingBox(minLat, minLng, maxLat, maxLng)` → for garbage report map layer.
+- `getUnderservedDistricts()` → computes Collection_Point density per district; flags those below 0.5/km².
 
 #### Ingestion Scheduler
 
@@ -161,8 +175,10 @@ Runs at startup and every 24 hours (configurable via `INGEST_INTERVAL_HOURS` env
 3. Upserts into PostgreSQL using `ON CONFLICT (source_id) DO UPDATE`.
 4. Logs warnings for records with missing required fields; continues processing.
 5. Updates `dataset_ingestion_status` table with last-updated timestamp.
+6. Recalculates Underserved_Area status for affected districts within 60 seconds of new Collection_Point ingestion.
 
 **District area ingestion note:** District land area (`area_km2`) is derived directly from the GeoJSON boundary polygons using PostGIS `ST_Area(ST_Transform(boundary, 3857)) / 1e6` — no separate area dataset is required. The 2021 Population Census data is ingested for map context and demographic reference only; it is not used in leaderboard scoring.
+
 
 ---
 
@@ -196,25 +212,43 @@ CREATE TABLE collection_points (
 );
 CREATE INDEX idx_cp_location ON collection_points USING GIST (location);
 
+-- Residential Areas (estates or district-level fallback zones)
+CREATE TABLE residential_areas (
+  id            SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL,
+  district_id   INTEGER REFERENCES districts(id),
+  location      GEOMETRY(Point, 4326),        -- centroid of the area
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Building Points Aggregate (one row per residential area)
+CREATE TABLE building_points (
+  residential_area_id INTEGER PRIMARY KEY REFERENCES residential_areas(id),
+  total_points        BIGINT NOT NULL DEFAULT 0,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Residents (created on first API call with a new session token)
 CREATE TABLE residents (
-  id            TEXT PRIMARY KEY,             -- base64(displayName:district)
-  display_name  TEXT NOT NULL,
-  district_id   INTEGER REFERENCES districts(id),
-  total_points  INTEGER NOT NULL DEFAULT 0,
-  checkin_count INTEGER NOT NULL DEFAULT 0,
-  report_count  INTEGER NOT NULL DEFAULT 0,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                   TEXT PRIMARY KEY,             -- base64(displayName:district)
+  display_name         TEXT NOT NULL,
+  district_id          INTEGER REFERENCES districts(id),
+  residential_area_id  INTEGER REFERENCES residential_areas(id),
+  total_points         INTEGER NOT NULL DEFAULT 0,
+  checkin_count        INTEGER NOT NULL DEFAULT 0,
+  report_count         INTEGER NOT NULL DEFAULT 0,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Points Transactions
 CREATE TABLE points_transactions (
-  id              SERIAL PRIMARY KEY,
-  resident_id     TEXT NOT NULL REFERENCES residents(id),
-  points          INTEGER NOT NULL,
-  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('checkin', 'garbage_report')),
-  reference_id    TEXT NOT NULL,              -- collection_point id or garbage_report id
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                   SERIAL PRIMARY KEY,
+  resident_id          TEXT NOT NULL REFERENCES residents(id),
+  points               INTEGER NOT NULL,           -- individual_points awarded
+  building_points      INTEGER NOT NULL DEFAULT 0, -- building_points awarded (mirrors points)
+  transaction_type     TEXT NOT NULL CHECK (transaction_type IN ('checkin', 'garbage_report')),
+  reference_id         TEXT NOT NULL,              -- collection_point id or garbage_report id
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_pt_resident ON points_transactions (resident_id, created_at DESC);
 
@@ -257,7 +291,7 @@ CREATE TABLE dataset_ingestion_status (
   status        TEXT NOT NULL DEFAULT 'pending'
 );
 
--- Public Housing Estates (for map layer)
+-- Public Housing Estates (for map layer and residential area matching)
 CREATE TABLE housing_estates (
   id          SERIAL PRIMARY KEY,
   source_id   TEXT NOT NULL UNIQUE,
@@ -265,7 +299,29 @@ CREATE TABLE housing_estates (
   district_id INTEGER REFERENCES districts(id),
   location    GEOMETRY(Point, 4326) NOT NULL
 );
+
+-- Bin Requests
+CREATE TABLE bin_requests (
+  id            SERIAL PRIMARY KEY,
+  resident_id   TEXT NOT NULL REFERENCES residents(id),
+  district_id   INTEGER REFERENCES districts(id),
+  location      GEOMETRY(Point, 4326) NOT NULL,
+  description   TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Redemptions
+CREATE TABLE redemptions (
+  id                SERIAL PRIMARY KEY,
+  resident_id       TEXT NOT NULL REFERENCES residents(id),
+  tier              TEXT NOT NULL,               -- e.g. "50", "100", "200"
+  hkd_value         DOUBLE PRECISION NOT NULL,
+  points_deducted   INTEGER NOT NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_redemptions_resident ON redemptions (resident_id, created_at DESC);
 ```
+
 
 ### API Request / Response Shapes
 
@@ -284,7 +340,12 @@ interface CheckInRequest {
   lng: number;
 }
 interface CheckInResponse {
-  data: { pointsAwarded: number; totalPoints: number; checkinId: number }
+  data: {
+    pointsAwarded: number;         // individual_points awarded
+    buildingPointsAwarded: number; // building_points credited to residential area
+    totalPoints: number;
+    checkinId: number;
+  }
 }
 
 // POST /garbage-reports
@@ -315,6 +376,65 @@ interface CollectionPointNearby {
   lat: number;
   lng: number;
   distanceMetres: number;
+}
+
+// GET /map/stats  (bounding box aggregate)
+interface MapStatsResponse {
+  data: { totalCheckins: number; totalPoints: number; totalGarbageReports: number }
+}
+
+// POST /bin-requests
+interface BinRequestRequest {
+  lat: number;
+  lng: number;
+  description?: string;
+}
+interface BinRequestResponse {
+  data: { binRequestId: number; createdAt: string }
+}
+
+// GET /credits/redemptions
+interface RedemptionRecord {
+  id: number;
+  tier: string;
+  hkdValue: number;
+  pointsDeducted: number;
+  createdAt: string;
+}
+
+// POST /credits/redeem
+interface RedeemRequest {
+  tier: string;   // e.g. "50" | "100" | "200"
+}
+interface RedeemResponse {
+  data: { redemptionId: number; updatedBalance: number; hkdValue: number }
+}
+
+// GET /residential-areas/:id/points
+interface ResidentialAreaPointsResponse {
+  data: {
+    residentialAreaId: number;
+    name: string;
+    totalBuildingPoints: number;
+    rankInDistrict: number;
+    contributors: Array<{ displayName: string }>;
+  }
+}
+
+// GET /residential-areas/leaderboard
+interface ResidentialAreaLeaderboardEntry {
+  rank: number;
+  residentialAreaId: number;
+  name: string;
+  totalBuildingPoints: number;
+}
+
+// GET /collection-points/underserved
+interface UnderservedAreaEntry {
+  districtId: number;
+  districtName: string;
+  collectionPointDensity: number;   // collection points per km²
+  residentialPopulation: number;
 }
 
 // Standard error envelope
@@ -356,7 +476,7 @@ interface ApiError {
 
 ### Property 4: Check-in points by tier
 
-*For any* resident and any collection point, the points awarded by a successful check-in should equal exactly 10 if the collection point's access_tier is "basic", and exactly 20 if it is "premium".
+*For any* resident and any collection point, the points awarded by a successful check-in should equal exactly 10 if the collection point's access_tier is "basic", and exactly 20 if it is "premium" (before any bonus multiplier).
 
 **Validates: Requirements 2.1, 2.2**
 
@@ -374,15 +494,15 @@ interface ApiError {
 
 *For any* district, the value of `district_points.total_points` should equal the sum of all `points_transactions.points` for all residents whose `district_id` matches that district.
 
-**Validates: Requirements 2.4, 3.1**
+**Validates: Requirements 2.5, 3.1**
 
 ---
 
 ### Property 7: Points transaction completeness
 
-*For any* points transaction stored in the database, the record should contain: resident_id, points, transaction_type (one of "checkin" or "garbage_report"), reference_id, and created_at timestamp.
+*For any* points transaction stored in the database, the record should contain: resident_id, points (individual_points), building_points, transaction_type (one of "checkin" or "garbage_report"), reference_id, and created_at timestamp.
 
-**Validates: Requirements 2.5**
+**Validates: Requirements 2.6**
 
 ---
 
@@ -390,7 +510,7 @@ interface ApiError {
 
 *For any* resident with one or more points transactions, the list returned by `GET /residents/me/points` should be sorted by created_at descending, and the profile tab should show at most the 20 most recent transactions in the same order.
 
-**Validates: Requirements 2.6, 10.3**
+**Validates: Requirements 2.7, 10.3**
 
 ---
 
@@ -398,7 +518,7 @@ interface ApiError {
 
 *For any* resident and collection point, if a successful check-in exists with a created_at timestamp T, then any subsequent check-in attempt for the same (resident, collection point) pair with a timestamp in the range (T, T + 60 minutes) should be rejected with HTTP 409 and award zero points.
 
-**Validates: Requirements 2.7**
+**Validates: Requirements 2.8**
 
 ---
 
@@ -444,7 +564,7 @@ interface ApiError {
 
 ### Property 15: Check-in response completeness
 
-*For any* accepted check-in, the API response should contain pointsAwarded (matching the tier's defined value) and totalPoints (equal to the resident's previous total plus pointsAwarded).
+*For any* accepted check-in, the API response should contain pointsAwarded (matching the tier's defined value), buildingPointsAwarded (equal to pointsAwarded), and totalPoints (equal to the resident's previous total plus pointsAwarded).
 
 **Validates: Requirements 7.5**
 
@@ -508,9 +628,66 @@ interface ApiError {
 
 ### Property 23: Resident profile completeness
 
-*For any* resident, the response from `GET /residents/me` should contain: display name, district, total points, check-in count, garbage report count, and district leaderboard rank.
+*For any* resident, the response from `GET /residents/me` should contain: display name, district, total individual_points, total building_points for their residential area, check-in count, garbage report count, and district leaderboard rank.
 
 **Validates: Requirements 10.6**
+
+---
+
+### Property 24: Dual reward atomicity
+
+*For any* successful check-in or garbage report, the individual_points credited to the resident and the building_points credited to the resident's Residential_Area should be equal in value and written in the same database transaction — if either write fails, neither should be committed.
+
+**Validates: Requirements 2.4, 14.1**
+
+---
+
+### Property 25: Bonus multiplier for underserved premium check-ins
+
+*For any* check-in at a Premium_Access Collection_Point located in an Underserved_Area, the individual_points awarded should equal exactly 30 (20 × 1.5), and the building_points awarded should equal the same value.
+
+**Validates: Requirements 2.9**
+
+---
+
+### Property 26: Redemption balance check
+
+*For any* redemption request where the resident's current Individual_Points balance is less than the tier's required points, the API should reject the request with HTTP 422 and return the current balance and required balance; no points should be deducted.
+
+**Validates: Requirements 13.4, 13.5**
+
+---
+
+### Property 27: Bin request storage completeness
+
+*For any* valid bin request submission, the stored record should contain: resident_id, GPS coordinates, district_id, and created_at timestamp; and the API should return a confirmation within 3 seconds.
+
+**Validates: Requirements 12.2, 12.3**
+
+---
+
+### Property 28: Underserved area calculation
+
+*For any* district, the API should flag it as an Underserved_Area if and only if its Collection_Point density (collection points / area_km2) is strictly less than 0.5.
+
+**Validates: Requirements 12.5**
+
+---
+
+### Property 29: Building points aggregate consistency
+
+*For any* Residential_Area, the value of `building_points.total_points` should equal the sum of all `points_transactions.building_points` for all residents whose `residential_area_id` matches that area.
+
+**Validates: Requirements 14.1**
+
+---
+
+### Property 30: Residential area leaderboard ordering
+
+*For any* district, the list returned by `GET /residential-areas/leaderboard?districtId=X` should be sorted by total_building_points descending, with no two entries sharing the same rank.
+
+**Validates: Requirements 14.5**
+
 
 ---
 
@@ -525,6 +702,7 @@ interface ApiError {
 | No photo attached to report | Block submission; show error: "Please attach a photo" |
 | API returns 409 (duplicate check-in) | Show: "You already checked in here recently. Try again in X minutes." |
 | API returns 422 (too far) | Show: "You're too far from this location to check in." |
+| API returns 422 (insufficient balance) | Show current balance and required balance for selected redemption tier |
 | API returns 401 | Clear session; redirect to onboarding |
 | API returns 400 | Show field-level validation error from response body |
 | API returns 500 or network error | Show generic error toast; do not expose internal details |
@@ -538,6 +716,7 @@ interface ApiError {
 | Missing session token | 401 | `{ error: { message, requestId } }` |
 | Duplicate check-in | 409 | `{ error: { message, retryAfterSeconds, requestId } }` |
 | Resident too far | 422 | `{ error: { message, distanceMetres, requestId } }` |
+| Insufficient redemption balance | 422 | `{ error: { message, currentBalance, requiredBalance, requestId } }` |
 | Unhandled exception | 500 | `{ error: { message: "Internal server error", requestId } }` |
 | Ingestion record missing field | No HTTP response | Log warning: `{ level: "warn", dataset, field, sourceId }` |
 
@@ -591,7 +770,7 @@ Focus on:
 - Specific examples: onboarding happy path, sign-out flow, check-in confirmation UI
 - Integration points: API client ↔ auth middleware, spatial service ↔ PostGIS
 - Edge cases: empty radius results (200 + empty array), radius cap at 10,000 m, WebGL fallback
-- Error conditions: 401 redirect, 409 retry message, 422 distance message
+- Error conditions: 401 redirect, 409 retry message, 422 distance message, 422 insufficient balance
 
 Avoid writing unit tests that duplicate what property tests already cover (e.g. don't write 10 unit tests for different display name lengths when Property 1 covers all lengths).
 
@@ -600,10 +779,14 @@ Avoid writing unit tests that duplicate what property tests already cover (e.g. 
 | Layer | Unit | Property |
 |-------|------|----------|
 | Auth / session logic | ✓ | Properties 1–3 |
-| Points service | ✓ | Properties 4–9 |
+| Points service | ✓ | Properties 4–9, 24–25 |
 | Leaderboard | ✓ | Property 10 |
-| Spatial service | ✓ | Properties 11–14, 17–18 |
+| Spatial service | ✓ | Properties 11–14, 17–18, 28 |
 | Ingestion normalizer | ✓ | Property 16 |
 | API response envelope | ✓ | Properties 20–22 |
 | Frontend validation | ✓ | Properties 1, 19 |
 | Profile / history | ✓ | Properties 8, 23 |
+| Check-in response | ✓ | Property 15 |
+| Bin requests | ✓ | Property 27 |
+| Redemption service | ✓ | Property 26 |
+| Building points / residential areas | ✓ | Properties 29–30 |
