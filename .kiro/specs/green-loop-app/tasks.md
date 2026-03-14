@@ -309,17 +309,17 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: tapping Sign Out clears localStorage session and navigates to onboarding
     - _Requirements: 1.6, 10.5_
 
-- [ ] 16. Frontend: Credits Dashboard tab
-  - [ ] 16.1 Implement `CreditsDashboardTab` component
+- [x] 16. Frontend: Credits Dashboard tab
+  - [x] 16.1 Implement `CreditsDashboardTab` component
     - Fetch `GET /residents/me`; display current Individual_Points balance, total earned, total redeemed, and Residential_Area Building_Points balance
     - Display available Octopus card redemption tiers (points cost + HKD value)
     - Display motivational message showing points needed to reach next tier
     - Fetch `GET /residential-areas/leaderboard?districtId=...`; display top-5 residential areas within the resident's district ranked by building_points
     - _Requirements: 13.1, 13.2, 13.11, 13.12, 14.4_
-  - [ ] 16.2 Implement redemption flow
+  - [x] 16.2 Implement redemption flow
     - Tier selection + confirm button calls `POST /credits/redeem`; handle 422 (show current vs required balance); show updated balance and confirmation ID on success
     - _Requirements: 13.3, 13.4, 13.5, 13.7_
-  - [ ] 16.3 Implement redemption history list
+  - [x] 16.3 Implement redemption history list
     - Fetch `GET /credits/redemptions`; display tier, HKD value, points deducted, timestamp for each past redemption
     - _Requirements: 13.8, 13.9_
   - [ ]* 16.4 Write unit test for redemption flow error states
