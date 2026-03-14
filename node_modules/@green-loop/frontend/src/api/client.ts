@@ -25,14 +25,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
+    let errorData: Record<string, unknown> = {};
     try {
-      const body = (await res.json()) as { error?: { message?: string } };
+      const body = (await res.json()) as { error?: { message?: string } & Record<string, unknown> };
       message = body.error?.message ?? message;
+      errorData = (body.error as Record<string, unknown>) ?? {};
     } catch {
       // ignore parse errors
     }
-    const err = new ApiError(message, res.status);
-    throw err;
+    throw new ApiError(message, res.status, errorData);
   }
 
   return res.json() as Promise<T>;
@@ -42,6 +43,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly data: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = 'ApiError';

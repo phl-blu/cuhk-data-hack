@@ -260,26 +260,26 @@ Incremental build of the Green Loop full-stack app: monorepo with `backend/` (No
     - Test: geolocation unavailable → district centroid used; loading indicator shown; stale data not shown
     - _Requirements: 4.5, 4.6_
 
-- [ ] 13. Frontend: Map tab
-  - [ ] 13.1 Implement `MapTab` with Mapbox GL JS
+- [x] 13. Frontend: Map tab
+  - [x] 13.1 Implement `MapTab` with Mapbox GL JS
     - Initialise map with 3D pitch + building extrusion layer when WebGL available; fall back to 2D flat map silently
     - Center on device location or district centroid
     - _Requirements: 5.1, 5.7_
-  - [ ] 13.2 Add collection-point marker layer
+  - [x] 13.2 Add collection-point marker layer
     - Fetch `GET /collection-points/nearby` on mount and on debounced pan/zoom
     - Blue markers for basic, green for premium; tap opens bottom-sheet detail panel
     - Detail panel shows name, tier, accepted materials, distance, "Check In" button, and "Get Directions" button (opens device maps app with collection point coordinates)
     - _Requirements: 5.2, 5.3, 5.5, 7.1, 12.4_
-  - [ ] 13.3 Add garbage-report marker layer
+  - [x] 13.3 Add garbage-report marker layer
     - Fetch `GET /garbage-reports` with current bounding box; red markers
     - Tap shows report timestamp
     - _Requirements: 5.6, 6.6_
-  - [ ] 13.4 Implement check-in flow from map
+  - [x] 13.4 Implement check-in flow from map
     - "Check In" button in detail panel calls `POST /checkins` with resident coords
     - Show confirmation with individual_points awarded and building_points credited to residential area on success
     - Handle 409 (retry message with minutes remaining), 422 (too far message), 401 (redirect to onboarding)
     - _Requirements: 7.1, 7.2, 7.5, 7.6_
-  - [ ] 13.5 Implement live statistics overlay and underserved area shading
+  - [x] 13.5 Implement live statistics overlay and underserved area shading
     - On viewport change, fetch `GET /map/stats` with current bounding box; display total check-ins, total points, total garbage reports in an overlay panel
     - Fetch `GET /collection-points/underserved`; render a distinct fill layer on the map for flagged districts
     - Add "Request a Bin" button in map toolbar (visible at all zoom levels); tapping opens bin request form
