@@ -23,14 +23,11 @@ const HK_DISTRICTS = [
   'Yuen Long',
 ];
 
-const MAPBOX_LS_KEY = 'mapbox_token';
-
 export default function OnboardingScreen() {
   const { createSession } = useAuth();
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState('');
   const [district, setDistrict] = useState('');
-  const [mapboxToken, setMapboxToken] = useState(() => localStorage.getItem(MAPBOX_LS_KEY) ?? '');
   const [errors, setErrors] = useState<{ displayName?: string; district?: string }>({});
 
   function validate(): boolean {
@@ -49,8 +46,6 @@ export default function OnboardingScreen() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
-    const token = mapboxToken.trim();
-    if (token) localStorage.setItem(MAPBOX_LS_KEY, token);
     createSession(displayName.trim(), district);
     navigate('/');
   }
@@ -94,21 +89,6 @@ export default function OnboardingScreen() {
             ))}
           </select>
           {errors.district && <p className="error-text">{errors.district}</p>}
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-            Mapbox Token <span style={{ fontWeight: 400, color: '#6b7280' }}>(optional — needed for the map)</span>
-          </label>
-          <input
-            type="text"
-            value={mapboxToken}
-            onChange={(e) => setMapboxToken(e.target.value)}
-            placeholder="pk.eyJ1..."
-          />
-          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.3rem' }}>
-            Free at <a href="https://account.mapbox.com/auth/signup" target="_blank" rel="noopener noreferrer" style={{ color: '#15803d' }}>mapbox.com</a>
-          </p>
         </div>
 
         <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>

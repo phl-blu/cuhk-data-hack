@@ -9,20 +9,90 @@ import { normalizePopulationCensus, type PopulationCensusRaw } from './normalize
 import { normalizeHousingEstates, type HousingEstateRaw } from './normalizers/housingEstates.js';
 
 // ---------------------------------------------------------------------------
+// Generic GeoJSON WFS fetcher
+// ---------------------------------------------------------------------------
+
+async function fetchGeoJson(url: string): Promise<Array<{ properties: Record<string, unknown>; geometry: { type: string; coordinates: unknown } }>> {
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json', 'User-Agent': 'GreenLoopApp/1.0' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+  const json = await res.json() as { features?: Array<{ properties: Record<string, unknown>; geometry: { type: string; coordinates: unknown } }> };
+  return json.features ?? [];
+}
+
+// Extract centroid lng/lat from a GeoJSON geometry (Point or Polygon)
+function extractCoords(geometry: { type: string; coordinates: unknown }): { lat: number; lng: number } | null {
+  if (!geometry) return null;
+  if (geometry.type === 'Point') {
+    const [lng, lat] = geometry.coordinates as [number, number];
+    return { lat, lng };
+  }
+  if (geometry.type === 'Polygon') {
+    // Use centroid of first ring
+    const ring = (geometry.coordinates as number[][][])[0];
+    if (!ring || ring.length === 0) return null;
+    const lng = ring.reduce((s, p) => s + p[0]!, 0) / ring.length;
+    const lat = ring.reduce((s, p) => s + p[1]!, 0) / ring.length;
+    return { lat, lng };
+  }
+  if (geometry.type === 'MultiPolygon') {
+    const firstRing = ((geometry.coordinates as number[][][][])[0])?.[0];
+    if (!firstRing || firstRing.length === 0) return null;
+    const lng = firstRing.reduce((s, p) => s + p[0]!, 0) / firstRing.length;
+    const lat = firstRing.reduce((s, p) => s + p[1]!, 0) / firstRing.length;
+    return { lat, lng };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Placeholder fetch functions — real URLs come from env vars
 // ---------------------------------------------------------------------------
 
 async function fetchOpenSpace(): Promise<OpenSpaceRaw[]> {
-  const url = process.env['OPEN_SPACE_API_URL'];
-  if (!url) return [];
-  // TODO: replace with real HTTP fetch when API URL is configured
-  return [];
+  const url = process.env['OPEN_SPACE_API_URL'] ??
+    'https://portal.csdi.gov.hk/server/services/common/epd_rcd_1669597014943_12158/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=OS_POLYGON_INV_EPD&outputFormat=geojson&count=5000';
+  try {
+    const features = await fetchGeoJson(url);
+    return features.map((f) => {
+      const p = f.properties;
+      const coords = extractCoords(f.geometry);
+      return {
+        sourceId: p['OBJECTID'] ?? p['objectid'] ?? p['id'],
+        name: p['FACNAME_EN'] ?? p['facname_en'] ?? p['NAME_EN'] ?? p['name_en'] ?? p['NAME'] ?? p['name'] ?? 'Recycling Station',
+        lat: coords?.lat,
+        lng: coords?.lng,
+        materials: [],
+      } as OpenSpaceRaw;
+    });
+  } catch (err) {
+    console.error('[ingestion] fetchOpenSpace failed', err);
+    return [];
+  }
 }
 
 async function fetchRecyclableCollection(): Promise<RecyclableCollectionRaw[]> {
-  const url = process.env['RECYCLABLE_COLLECTION_API_URL'];
-  if (!url) return [];
-  return [];
+  const url = process.env['RECYCLABLE_COLLECTION_API_URL'] ??
+    'https://portal.csdi.gov.hk/server/services/common/epd_rcd_1630899452408_9505/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=geotagging&outputFormat=geojson&count=5000';
+  try {
+    const features = await fetchGeoJson(url);
+    return features.map((f) => {
+      const p = f.properties;
+      const coords = extractCoords(f.geometry);
+      return {
+        sourceId: p['OBJECTID'] ?? p['objectid'] ?? p['id'],
+        name: p['FACNAME_EN'] ?? p['facname_en'] ?? p['NAME_EN'] ?? p['name_en'] ?? p['NAME'] ?? p['name'] ?? 'Collection Point',
+        lat: coords?.lat,
+        lng: coords?.lng,
+        materials: [],
+        type: p['TYPE'] ?? p['type'] ?? p['CATEGORY'] ?? p['category'],
+      } as RecyclableCollectionRaw;
+    });
+  } catch (err) {
+    console.error('[ingestion] fetchRecyclableCollection failed', err);
+    return [];
+  }
 }
 
 async function fetchCensus(): Promise<PopulationCensusRaw[]> {

@@ -71,7 +71,7 @@ export async function awardCheckIn(
     // Upsert district_points
     await client.query(
       `INSERT INTO district_points (district_id, total_points, updated_at)
-       SELECT district_id, $1, NOW() FROM residents WHERE id = $2
+       SELECT district_id, $1, NOW() FROM residents WHERE id = $2 AND district_id IS NOT NULL
        ON CONFLICT (district_id) DO UPDATE
          SET total_points = district_points.total_points + $1,
              updated_at = NOW()`,
@@ -138,7 +138,7 @@ export async function awardGarbageReport(
     // Upsert district_points
     await client.query(
       `INSERT INTO district_points (district_id, total_points, updated_at)
-       SELECT district_id, $1, NOW() FROM residents WHERE id = $2
+       SELECT district_id, $1, NOW() FROM residents WHERE id = $2 AND district_id IS NOT NULL
        ON CONFLICT (district_id) DO UPDATE
          SET total_points = district_points.total_points + $1,
              updated_at = NOW()`,

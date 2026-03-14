@@ -49,11 +49,19 @@ interface CollectionPoint {
   distanceMetres: number;
 }
 
+interface NearbyReport {
+  id: number;
+  lat: number;
+  lng: number;
+  districtName: string | null;
+  createdAt: string;
+}
+
 async function fetchNearestPoint(lat: number, lng: number): Promise<CollectionPoint | null> {
-  const res = await apiClient.get<{ data: { collectionPoints: CollectionPoint[] } }>(
-    `/collection-points/nearby?lat=${lat}&lng=${lng}&radius=2000`,
+  const res = await apiClient.get<{ data: { points: CollectionPoint[] } }>(
+    `/collection-points/nearby?lat=${lat}&lng=${lng}&radius=10000`,
   );
-  return res.data.collectionPoints[0] ?? null;
+  return res.data.points[0] ?? null;
 }
 
 export default function DashboardTab() {
@@ -61,6 +69,7 @@ export default function DashboardTab() {
   const { session } = useAuth();
   const [profile, setProfile] = useState<ResidentProfile | null>(null);
   const [nearest, setNearest] = useState<CollectionPoint | null>(null);
+  const [nearbyReports, setNearbyReports] = useState<NearbyReport[]>([]);
   const [usingCentroid, setUsingCentroid] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -83,6 +92,11 @@ export default function DashboardTab() {
         fetchNearestPoint(lat, lng)
           .then((pt) => setNearest(pt))
           .catch(() => {/* ignore */});
+        // Fetch reports within ~2km bounding box (~0.018 degrees)
+        const delta = 0.018;
+        apiClient.get<{ data: { reports: NearbyReport[] } }>(
+          `/garbage-reports?minLat=${lat - delta}&minLng=${lng - delta}&maxLat=${lat + delta}&maxLng=${lng + delta}`
+        ).then((r) => setNearbyReports(r.data.reports ?? [])).catch(() => {});
       },
       () => {
         // Geolocation unavailable — fall back to district centroid
@@ -93,6 +107,10 @@ export default function DashboardTab() {
           fetchNearestPoint(centroid[1], centroid[0])
             .then((pt) => setNearest(pt))
             .catch(() => {/* ignore */});
+          const delta = 0.018;
+          apiClient.get<{ data: { reports: NearbyReport[] } }>(
+            `/garbage-reports?minLat=${centroid[1] - delta}&minLng=${centroid[0] - delta}&maxLat=${centroid[1] + delta}&maxLng=${centroid[0] + delta}`
+          ).then((r) => setNearbyReports(r.data.reports ?? [])).catch(() => {});
         }
       },
     );
@@ -187,6 +205,32 @@ export default function DashboardTab() {
           <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>
             {usingCentroid ? 'No collection points found nearby.' : 'Looking for nearby points…'}
           </p>
+        )}
+      </div>
+
+      {/* Nearby garbage reports */}
+      <div className="card">
+        <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>🗑️ Nearby Reports</div>
+        {nearbyReports.length === 0 ? (
+          <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>No reports in your area yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {nearbyReports.slice(0, 5).map((r) => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid #f3f4f6', paddingBottom: '0.4rem' }}>
+                <span style={{ color: '#374151' }}>
+                  📍 {r.districtName ?? `${r.lat.toFixed(3)}, ${r.lng.toFixed(3)}`}
+                </span>
+                <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>
+                  {new Date(r.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+            {nearbyReports.length > 5 && (
+              <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>
+                +{nearbyReports.length - 5} more — view on map
+              </p>
+            )}
+          </div>
         )}
       </div>
 

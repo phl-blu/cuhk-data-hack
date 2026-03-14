@@ -5,6 +5,18 @@ import { apiClient, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import BinRequestModal from './BinRequestModal';
 
+export function getMockFillLevel(id: number): number {
+  return (id * 37) % 101;
+}
+
+export function getFillCategory(pct: number): { label: string; color: string } {
+  if (pct <= 20) return { label: 'Empty',  color: '#16a34a' };
+  if (pct <= 40) return { label: 'Low',    color: '#16a34a' };
+  if (pct <= 60) return { label: 'Medium', color: '#d97706' };
+  if (pct <= 80) return { label: 'High',   color: '#dc2626' };
+  return           { label: 'Full',   color: '#dc2626' };
+}
+
 // District centroids for fallback when geolocation is unavailable
 const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
   'Central and Western': [114.1549, 22.2855],
@@ -27,7 +39,7 @@ const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
   'Yuen Long': [114.0228, 22.4447],
 };
 
-// HK bounding box — prevents panning outside Hong Kong
+// Debounce helper — prevents panning outside Hong Kong
 const HK_BOUNDS: [[number, number], [number, number]] = [
   [113.7, 22.1], // SW
   [114.5, 22.6], // NE
@@ -51,11 +63,22 @@ interface MapStats {
   totalGarbageReports: number;
 }
 
+interface GarbageReport {
+  id: number;
+  lat: number;
+  lng: number;
+  districtName?: string | null;
+  photoUrl?: string;
+  createdAt: string;
+}
+
 interface PopupInfo {
   point: CollectionPoint;
 }
 
-// Debounce helper
+interface ReportPopupInfo {
+  report: GarbageReport;
+}
 function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout>;
   return ((...args: Parameters<T>) => {
@@ -76,6 +99,7 @@ export default function MapTab() {
 
   const [stats, setStats] = useState<MapStats | null>(null);
   const [popup, setPopup] = useState<PopupInfo | null>(null);
+  const [reportPopup, setReportPopup] = useState<ReportPopupInfo | null>(null);
   const [checkinMsg, setCheckinMsg] = useState<string | null>(null);
   const [showBinModal, setShowBinModal] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -123,7 +147,7 @@ export default function MapTab() {
         el.className = 'cp-marker';
         el.style.cssText = `
           width: 14px; height: 14px; border-radius: 50%;
-          background: ${pt.accessTier === 'premium' ? '#16a34a' : '#2563eb'};
+          background: #2563eb;
           border: 2px solid #fff; cursor: pointer;
           box-shadow: 0 1px 4px rgba(0,0,0,0.35);
         `;
@@ -150,7 +174,7 @@ export default function MapTab() {
       const sw = bounds.getSouthWest();
       const ne = bounds.getNorthEast();
       const res = await apiClient.get<{
-        data: { reports?: Array<{ id: number; lat: number; lng: number; createdAt: string }> }
+        data: { reports?: GarbageReport[] }
       }>(`/garbage-reports?minLat=${sw.lat}&minLng=${sw.lng}&maxLat=${ne.lat}&maxLng=${ne.lng}`);
       const reports = res.data.reports ?? [];
 
@@ -164,12 +188,15 @@ export default function MapTab() {
       for (const r of reports) {
         const el = document.createElement('div');
         el.className = 'gr-marker';
-        el.title = new Date(r.createdAt).toLocaleString();
         el.style.cssText = `
-          width: 12px; height: 12px; border-radius: 50%;
-          background: #dc2626; border: 2px solid #fff; cursor: pointer;
+          width: 14px; height: 14px; border-radius: 50%;
+          background: #f97316; border: 2px solid #fff; cursor: pointer;
           box-shadow: 0 1px 4px rgba(0,0,0,0.35);
         `;
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setReportPopup({ report: r });
+        });
         const marker = new mapboxgl.Marker({ element: el })
           .setLngLat([r.lng, r.lat])
           .addTo(map);
@@ -277,14 +304,16 @@ export default function MapTab() {
 
         mapRef.current = map;
 
-        // User location marker (blue dot with red border)
+        // User location marker — red pin
         const userEl = document.createElement('div');
-        userEl.style.cssText = `
-          width: 16px; height: 16px; border-radius: 50%;
-          background: #ef4444; border: 3px solid #fff;
-          box-shadow: 0 0 0 3px rgba(239,68,68,0.35);
-        `;
-        userMarkerRef.current = new mapboxgl.Marker({ element: userEl })
+        userEl.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
+            <path d="M16 0C7.163 0 0 7.163 0 16c0 10.5 16 26 16 26S32 26.5 32 16C32 7.163 24.837 0 16 0z"
+              fill="#ef4444" stroke="#fff" stroke-width="2"/>
+            <circle cx="16" cy="16" r="6" fill="#fff"/>
+          </svg>`;
+        userEl.style.cssText = 'cursor: default; transform: translate(-50%, -100%);';
+        userMarkerRef.current = new mapboxgl.Marker({ element: userEl, anchor: 'bottom' })
           .setLngLat(center)
           .addTo(map);
 
@@ -503,6 +532,44 @@ export default function MapTab() {
         </div>
       )}
 
+      {/* Garbage report bottom sheet */}
+      {reportPopup && (
+        <div style={{
+          position: 'absolute', bottom: '5rem', left: '0.75rem', right: '0.75rem',
+          background: '#fff', borderRadius: '14px', padding: '1rem',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.18)', zIndex: 10,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1rem' }}>🗑️ Garbage Report</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.2rem' }}>
+                {reportPopup.report.districtName ?? `${reportPopup.report.lat.toFixed(4)}, ${reportPopup.report.lng.toFixed(4)}`}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.1rem' }}>
+                {new Date(reportPopup.report.createdAt).toLocaleString()}
+              </div>
+            </div>
+            <button
+              onClick={() => setReportPopup(null)}
+              style={{ background: 'none', padding: '0 0 0 0.5rem', fontSize: '1.3rem', color: '#9ca3af' }}
+              aria-label="Close"
+            >×</button>
+          </div>
+          {reportPopup.report.photoUrl && !reportPopup.report.photoUrl.startsWith('local://') ? (
+            <img
+              src={reportPopup.report.photoUrl}
+              alt="Garbage report"
+              style={{ width: '100%', borderRadius: '8px', maxHeight: '200px', objectFit: 'cover' }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div style={{ background: '#f3f4f6', borderRadius: '8px', padding: '1.5rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>
+              📷 No photo available
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Collection point bottom sheet */}
       {popup && (
         <div style={{
@@ -537,6 +604,24 @@ export default function MapTab() {
               ×
             </button>
           </div>
+
+          {(() => {
+            const pct = getMockFillLevel(popup.point.id);
+            const { label, color } = getFillCategory(pct);
+            return (
+              <div style={{ marginTop: '0.5rem' }}>
+                {/* Progress bar */}
+                <div style={{ background: '#e5e7eb', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, background: color, height: '100%', borderRadius: '4px' }} />
+                </div>
+                {/* Label row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  <span style={{ color: '#6b7280' }}>Fill level</span>
+                  <span style={{ color, fontWeight: 600 }}>{pct}% · {label}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem' }}>
             <button

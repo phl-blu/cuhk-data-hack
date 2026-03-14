@@ -22,10 +22,17 @@ router.post('/', authMiddleware, async (req, res, next) => {
 
     const key = `photos/${uuidv4()}.jpg`;
 
-    const clientConfig: ConstructorParameters<typeof S3Client>[0] = { region };
+    const clientConfig: ConstructorParameters<typeof S3Client>[0] = {
+      region,
+      credentials: {
+        accessKeyId: process.env['S3_ACCESS_KEY'] ?? '',
+        secretAccessKey: process.env['S3_SECRET_KEY'] ?? '',
+      },
+    };
     if (endpoint) {
       clientConfig.endpoint = endpoint;
-      clientConfig.forcePathStyle = true;
+      // R2 uses virtual-hosted style, not path style
+      clientConfig.forcePathStyle = false;
     }
 
     const s3 = new S3Client(clientConfig);
