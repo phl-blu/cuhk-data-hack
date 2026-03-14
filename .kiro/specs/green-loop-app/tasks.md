@@ -1,0 +1,349 @@
+# Implementation Plan: Green Loop App
+
+## Overview
+
+Incremental build of the Green Loop full-stack app: monorepo with `backend/` (Node.js/Express/TypeScript + PostgreSQL/PostGIS) and `frontend/` (React/Vite/TypeScript). Each task wires into the previous one so nothing is left orphaned.
+
+## Tasks
+
+- [x] 1. Scaffold monorepo and tooling
+  - Create root `package.json` with workspaces `["backend", "frontend"]`
+  - Add root `tsconfig.base.json` with strict TypeScript settings
+  - Add `.env.example` with all required env vars (`DATABASE_URL`, `S3_*`, `MAPBOX_TOKEN`, `INGEST_INTERVAL_HOURS`)
+  - Add `docker-compose.yml` with `postgres` (PostGIS image) service
+  - _Requirements: 11.1_
+
+- [x] 2. Backend: project setup and database schema
+  - [x] 2.1 Initialise `backend/` as a TypeScript/Express project
+    - `package.json`, `tsconfig.json`, `src/index.ts` with Express app and `GET /health` stub
+    - Install dependencies: `express`, `pg`, `postgis`, `uuid`, `node-cron`, `fast-check`, `vitest`
+    - _Requirements: 11.7, 8.8_
+  - [x] 2.2 Write and apply database migrations
+    - Create `backend/migrations/001_initial.sql` with all tables from the design: `districts`, `collection_points`, `residential_areas`, `building_points`, `residents` (with `residential_area_id`), `points_transactions` (with `building_points` column), `district_points`, `checkins`, `garbage_reports`, `bin_requests`, `redemptions`, `dataset_ingestion_status`, `housing_estates`
+    - Add a migration runner (`backend/src/db/migrate.ts`) that applies SQL files in order
+    - _Requirements: 5.4, 2.5, 3.1, 6.3, 8.1, 12.2, 13.6, 14.1_
+  - [ ]* 2.3 Write unit test for migration runner
+    - Verify idempotent re-run does not throw
+    - _Requirements: 8.1_
+
+- [x] 3. Backend: request middleware and error handling
+  - [x] 3.1 Implement request ID middleware and structured JSON logger
+    - Assign UUID v4 per request; attach to `req.requestId`; emit JSON log on response
+    - _Requirements: 11.5, 11.6_
+  - [ ]* 3.2 Write property test for request ID uniqueness
+    - **Property 22: Request ID uniqueness**
+    - **Validates: Requirements 11.5**
+  - [x] 3.3 Implement auth middleware (`backend/src/middleware/auth.ts`)
+    - Decode `X-Session-Token` (base64 `displayName:district`); populate `req.resident`
+    - Return 401 for missing or malformed token
+    - _Requirements: 11.3_
+  - [ ]* 3.4 Write property test for unauthenticated request rejection
+    - **Property 21: Unauthenticated request rejection**
+    - **Validates: Requirements 11.3**
+  - [x] 3.5 Implement global error handler and API response envelope helper
+    - `sendSuccess(res, data)` wraps in `{ data }`; `sendError(res, status, message, field?)` wraps in `{ error }`
+    - Unhandled exceptions return 500 with generic message; stack trace logged only
+    - _Requirements: 11.1, 11.4_
+  - [ ]* 3.6 Write property test for API response envelope
+    - **Property 20: API response envelope**
+    - **Validates: Requirements 11.1**
+
+
+- [x] 4. Backend: government dataset ingestion
+  - [x] 4.1 Implement ingestion normalizers for all four datasets
+    - `backend/src/ingestion/normalizers/openSpace.ts` — normalize to `collection_points`, `access_tier = 'premium'`
+    - `backend/src/ingestion/normalizers/recyclableCollection.ts` — normalize, classify tier per record
+    - `backend/src/ingestion/normalizers/populationCensus.ts` — normalize to district population context
+    - `backend/src/ingestion/normalizers/housingEstates.ts` — normalize to `housing_estates`
+    - Each normalizer logs a warning and skips records with missing required fields
+    - _Requirements: 8.2, 8.3, 8.4, 8.5, 8.6_
+  - [ ]* 4.2 Write property test for ingestion normalization
+    - **Property 16: Ingestion normalization**
+    - **Validates: Requirements 5.8, 8.2, 8.3, 8.4, 8.5, 8.6**
+  - [x] 4.3 Implement ingestion scheduler (`backend/src/ingestion/scheduler.ts`)
+    - Run at startup and on `INGEST_INTERVAL_HOURS` cron schedule
+    - Upsert records using `ON CONFLICT (source_id) DO UPDATE`
+    - Update `dataset_ingestion_status` after each dataset
+    - _Requirements: 8.1, 8.7_
+  - [x] 4.4 Wire `GET /health` to return ingestion status per dataset
+    - Query `dataset_ingestion_status`; return `{ data: { datasets: [...] } }`
+    - _Requirements: 8.8_
+
+- [x] 5. Backend: spatial service
+  - [x] 5.1 Implement `SpatialService` (`backend/src/services/spatial.ts`)
+    - `findNearby(lat, lng, radiusMetres)` using `ST_DWithin` + `ST_Distance`; cap radius at 10 000 m
+    - `pointInDistrict(lat, lng)` using `ST_Contains` against district boundaries
+    - `findInBoundingBox(minLat, minLng, maxLat, maxLng)` for garbage report layer
+    - _Requirements: 5.4, 6.9, 9.1, 9.2, 9.3, 9.5_
+  - [ ]* 5.2 Write property test for nearby endpoint correctness
+    - **Property 11: Nearby endpoint correctness**
+    - **Validates: Requirements 5.4, 9.1, 9.2, 9.3**
+  - [ ]* 5.3 Write property test for tier filter correctness
+    - **Property 12: Tier filter correctness**
+    - **Validates: Requirements 9.4**
+  - [ ]* 5.4 Write property test for coordinate validation
+    - **Property 13: Coordinate validation**
+    - **Validates: Requirements 9.6, 11.2**
+  - [ ]* 5.5 Write property test for garbage report bounding box
+    - **Property 17: Garbage report bounding box**
+    - **Validates: Requirements 6.5**
+  - [ ]* 5.6 Write property test for garbage report district derivation
+    - **Property 18: Garbage report district derivation**
+    - **Validates: Requirements 6.9**
+
+- [x] 6. Backend: points service
+  - [x] 6.1 Implement `PointsService` (`backend/src/services/points.ts`)
+    - `awardCheckIn(residentId, collectionPointId, tier, isUnderserved)` — 10 pts basic / 20 pts premium; apply 1.5× multiplier if Premium_Access + Underserved_Area; atomic transaction updating `points_transactions` (individual + building_points columns), `residents.total_points`, `district_points.total_points`, and `building_points.total_points` for the resident's Residential_Area
+    - `awardGarbageReport(residentId, reportId)` — 15 pts; same atomic dual-reward pattern
+    - `isDuplicateCheckIn(residentId, collectionPointId)` — query `checkins` within last 60 minutes
+    - `getPointsHistory(residentId)` — ordered by `created_at DESC`, includes individual_points and building_points per row
+    - `applyLowBalanceDeduction(residentId)` — check if balance fell below 50 after last redemption; apply 10-pt deduction to next redemption if so
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.9, 2.10, 14.1_
+  - [ ]* 6.2 Write property test for check-in points by tier
+    - **Property 4: Check-in points by tier**
+    - **Validates: Requirements 2.1, 2.2**
+  - [ ]* 6.3 Write property test for garbage report points
+    - **Property 5: Garbage report points**
+    - **Validates: Requirements 2.3**
+  - [ ]* 6.4 Write property test for district aggregate consistency
+    - **Property 6: District aggregate consistency**
+    - **Validates: Requirements 2.4, 3.1**
+  - [ ]* 6.5 Write property test for points transaction completeness
+    - **Property 7: Points transaction completeness**
+    - **Validates: Requirements 2.5**
+  - [ ]* 6.6 Write property test for points history ordering
+    - **Property 8: Points history ordering**
+    - **Validates: Requirements 2.6, 10.3**
+  - [ ]* 6.7 Write property test for duplicate check-in rejection
+    - **Property 9: Duplicate check-in rejection**
+    - **Validates: Requirements 2.7**
+  - [ ]* 6.8 Write property test for dual reward atomicity
+    - **Property 24: Dual reward atomicity**
+    - **Validates: Requirements 2.4, 14.1**
+  - [ ]* 6.9 Write property test for bonus multiplier on underserved premium check-ins
+    - **Property 25: Bonus multiplier for underserved premium check-ins**
+    - **Validates: Requirements 2.9**
+
+- [x] 7. Backend: REST API routes
+  - [x] 7.1 Implement `POST /checkins`
+    - Validate coordinates (400 if invalid); auth middleware; proximity check via `SpatialService.findNearby` (422 if >200 m); duplicate check (409); check if collection point is in Underserved_Area; award points via `PointsService.awardCheckIn`; return `{ data: { pointsAwarded, buildingPointsAwarded, totalPoints, checkinId } }`
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 2.1, 2.2, 2.9_
+  - [ ]* 7.2 Write property test for proximity check-in enforcement
+    - **Property 14: Proximity check-in enforcement**
+    - **Validates: Requirements 7.3, 7.4**
+  - [ ]* 7.3 Write property test for check-in response completeness
+    - **Property 15: Check-in response completeness**
+    - **Validates: Requirements 7.5**
+  - [x] 7.4 Implement `POST /garbage-reports`
+    - Validate photo URL and coordinates (400 if missing); auth middleware; `pointInDistrict` for district derivation; award 15 pts; return `{ data: { reportId, pointsAwarded, totalPoints } }`
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.7, 6.8, 6.9, 2.3_
+  - [ ]* 7.5 Write property test for garbage report photo requirement
+    - **Property 19: Garbage report photo requirement**
+    - **Validates: Requirements 6.2, 6.7**
+  - [x] 7.6 Implement `GET /garbage-reports`
+    - Accept `minLat`, `minLng`, `maxLat`, `maxLng`; use `SpatialService.findInBoundingBox`; return coordinates, timestamp, district, thumbnail URL
+    - _Requirements: 6.5, 5.6_
+  - [x] 7.7 Implement `GET /collection-points/nearby` and `GET /collection-points`
+    - `/nearby`: validate lat/lng/radius; cap at 10 000 m; sort by distance; return full shape
+    - `/collection-points`: optional `tier` filter
+    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
+  - [x] 7.8 Implement `GET /leaderboard`
+    - Join `district_points` with `districts`; compute `points_per_km2`; sort descending; assign rank
+    - _Requirements: 3.1, 3.2, 3.3_
+  - [ ]* 7.9 Write property test for leaderboard ordering
+    - **Property 10: Leaderboard ordering**
+    - **Validates: Requirements 3.1, 3.2**
+  - [x] 7.10 Implement `GET /residents/me` and `GET /residents/me/points`
+    - `/me`: upsert resident on first call; associate with Residential_Area (nearest housing estate within 500 m or district-level fallback); return profile + district rank + residential_area building_points
+    - `/me/points`: return last 20 transactions ordered by `created_at DESC`, each row includes `individual_points` and `building_points`
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.6, 14.2_
+  - [ ]* 7.11 Write property test for resident profile completeness
+    - **Property 23: Resident profile completeness**
+    - **Validates: Requirements 10.6**
+  - [x] 7.12 Implement `POST /upload-url` (pre-signed S3 URL)
+    - Auth middleware; generate pre-signed PUT URL for S3-compatible storage; return `{ data: { uploadUrl, photoUrl } }`
+    - _Requirements: 6.2, 6.3_
+  - [x] 7.13 Implement `GET /map/stats`
+    - Accept `minLat`, `minLng`, `maxLat`, `maxLng`; aggregate `checkins`, `points_transactions.points`, and `garbage_reports` within bounding box; return `{ data: { totalCheckins, totalPoints, totalGarbageReports } }`
+    - _Requirements: 5.9, 5.10, 11.7_
+  - [x] 7.14 Implement `GET /collection-points/underserved`
+    - Compute Collection_Point density per district (count / area_km2); flag districts below 0.5 threshold; return district name, density, and residential population
+    - _Requirements: 12.5, 12.7, 5.11_
+  - [ ]* 7.15 Write property test for underserved area calculation
+    - **Property 28: Underserved area calculation**
+    - **Validates: Requirements 12.5**
+  - [x] 7.16 Implement `POST /bin-requests`
+    - Auth middleware; validate coordinates; derive district via `pointInDistrict`; store in `bin_requests`; return confirmation within 3 s
+    - _Requirements: 12.1, 12.2, 12.3_
+  - [ ]* 7.17 Write property test for bin request storage completeness
+    - **Property 27: Bin request storage completeness**
+    - **Validates: Requirements 12.2, 12.3**
+  - [x] 7.18 Implement `POST /credits/redeem` and `GET /credits/redemptions`
+    - `POST /credits/redeem`: auth middleware; verify balance ≥ tier cost (422 if not); apply low-balance deduction check; deduct points and insert into `redemptions` atomically; return updated balance and redemption ID
+    - `GET /credits/redemptions`: return resident's redemption history ordered by `created_at DESC`
+    - _Requirements: 13.4, 13.5, 13.6, 13.7, 13.9, 13.10, 2.10_
+  - [ ]* 7.19 Write property test for redemption balance check
+    - **Property 26: Redemption balance check**
+    - **Validates: Requirements 13.4, 13.5**
+  - [x] 7.20 Implement `GET /residential-areas/:id/points` and `GET /residential-areas/leaderboard`
+    - `/:id/points`: return total building_points, rank within district, and contributor display names
+    - `/leaderboard`: accept optional `districtId`; return areas ranked by building_points descending
+    - _Requirements: 14.3, 14.5_
+  - [ ]* 7.21 Write property test for building points aggregate consistency
+    - **Property 29: Building points aggregate consistency**
+    - **Validates: Requirements 14.1**
+  - [ ]* 7.22 Write property test for residential area leaderboard ordering
+    - **Property 30: Residential area leaderboard ordering**
+    - **Validates: Requirements 14.5**
+
+- [ ] 8. Checkpoint — backend
+  - Ensure all backend tests pass and `GET /health` returns 200 with ingestion status. Ask the user if questions arise.
+
+
+- [ ] 9. Frontend: project setup and shell
+  - [ ] 9.1 Initialise `frontend/` as a React/Vite/TypeScript project
+    - `npm create vite@latest frontend -- --template react-ts`
+    - Install: `react-router-dom`, `mapbox-gl`, `fast-check`, `@testing-library/react`, `vitest`
+    - Configure `vite.config.ts` with proxy to backend dev server
+    - Add mobile-first base CSS (viewport meta, `100dvh` layout, touch-action)
+    - _Requirements: 5.7_
+  - [ ] 9.2 Implement `AuthProvider` and `LocalStorageAuthProvider`
+    - Define `AuthProvider` interface and `Session` type matching design
+    - `LocalStorageAuthProvider`: `getSession`, `createSession`, `clearSession`, `getSessionToken`
+    - Export `AuthContext` and `useAuth` hook; wrap app in `<AuthProvider>`
+    - `residentId = btoa(\`\${displayName}:\${district}\`)`
+    - _Requirements: 1.3, 1.4, 1.6, 1.7_
+  - [ ]* 9.3 Write property test for session round-trip
+    - **Property 2: Session round-trip**
+    - **Validates: Requirements 1.3, 1.7**
+  - [ ]* 9.4 Write property test for sign-out clears session
+    - **Property 3: Sign-out clears session**
+    - **Validates: Requirements 1.6, 10.5**
+  - [ ] 9.5 Implement tab router with six routes
+    - `react-router-dom` `<Routes>`: `/` → Leaderboard, `/dashboard` → Dashboard, `/map` → Map, `/report` → GarbageReport, `/credits` → Credits, `/profile` → Profile
+    - Bottom tab bar component with active-state styling
+    - Guard: redirect to `/onboarding` if no session
+    - _Requirements: 1.4, 13.1_
+
+- [ ] 10. Frontend: onboarding screen
+  - [ ] 10.1 Implement `OnboardingScreen` component
+    - Display name text input (1–50 chars) and district `<select>` with all 18 HK districts
+    - On submit: validate both fields; call `createSession`; navigate to `/`
+    - Show field-level validation errors for empty name or no district selected
+    - _Requirements: 1.1, 1.2, 1.3, 1.5_
+  - [ ]* 10.2 Write property test for display name validation
+    - **Property 1: Display name validation**
+    - **Validates: Requirements 1.2, 1.5**
+  - [ ]* 10.3 Write unit test for onboarding happy path and error states
+    - Test: valid submission creates session and navigates; empty name shows error; no district shows error
+    - _Requirements: 1.1, 1.2, 1.5_
+
+- [ ] 11. Frontend: Leaderboard tab
+  - [ ] 11.1 Implement `LeaderboardTab` component
+    - Fetch `GET /leaderboard` on mount; display ranked list with district name, points/km², rank
+    - Top-3 entries visually distinguished (e.g. gold/silver/bronze styling)
+    - Highlight the resident's own district row
+    - Show loading indicator while fetching; no stale data shown
+    - _Requirements: 3.4, 3.5, 3.6_
+  - [ ]* 11.2 Write unit test for leaderboard rendering
+    - Test: own district highlighted; top-3 have distinct style; loading state shown
+    - _Requirements: 3.4, 3.5, 3.6_
+
+- [ ] 12. Frontend: Dashboard tab
+  - [ ] 12.1 Implement `DashboardTab` component
+    - Fetch `GET /residents/me` and `GET /collection-points/nearby` (using device location or district centroid fallback)
+    - Display: district, total points, leaderboard rank, nearest collection point (name, tier, distance), monthly check-in and report counts
+    - "Go to Map" button navigates to `/map` centered on nearest point
+    - Show loading indicator; no stale data
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+  - [ ]* 12.2 Write unit test for dashboard fallback and loading states
+    - Test: geolocation unavailable → district centroid used; loading indicator shown; stale data not shown
+    - _Requirements: 4.5, 4.6_
+
+- [ ] 13. Frontend: Map tab
+  - [ ] 13.1 Implement `MapTab` with Mapbox GL JS
+    - Initialise map with 3D pitch + building extrusion layer when WebGL available; fall back to 2D flat map silently
+    - Center on device location or district centroid
+    - _Requirements: 5.1, 5.7_
+  - [ ] 13.2 Add collection-point marker layer
+    - Fetch `GET /collection-points/nearby` on mount and on debounced pan/zoom
+    - Blue markers for basic, green for premium; tap opens bottom-sheet detail panel
+    - Detail panel shows name, tier, accepted materials, distance, "Check In" button, and "Get Directions" button (opens device maps app with collection point coordinates)
+    - _Requirements: 5.2, 5.3, 5.5, 7.1, 12.4_
+  - [ ] 13.3 Add garbage-report marker layer
+    - Fetch `GET /garbage-reports` with current bounding box; red markers
+    - Tap shows report timestamp
+    - _Requirements: 5.6, 6.6_
+  - [ ] 13.4 Implement check-in flow from map
+    - "Check In" button in detail panel calls `POST /checkins` with resident coords
+    - Show confirmation with individual_points awarded and building_points credited to residential area on success
+    - Handle 409 (retry message with minutes remaining), 422 (too far message), 401 (redirect to onboarding)
+    - _Requirements: 7.1, 7.2, 7.5, 7.6_
+  - [ ] 13.5 Implement live statistics overlay and underserved area shading
+    - On viewport change, fetch `GET /map/stats` with current bounding box; display total check-ins, total points, total garbage reports in an overlay panel
+    - Fetch `GET /collection-points/underserved`; render a distinct fill layer on the map for flagged districts
+    - Add "Request a Bin" button in map toolbar (visible at all zoom levels); tapping opens bin request form
+    - _Requirements: 5.9, 5.10, 5.11, 12.1, 12.6_
+  - [ ]* 13.6 Write unit test for map error handling
+    - Test: 409 shows retry message; 422 shows distance message; 401 clears session and redirects
+    - _Requirements: 7.4, 7.5, 7.6_
+
+- [ ] 14. Frontend: Garbage Report tab
+  - [ ] 14.1 Implement `GarbageReportTab` component
+    - Capture GPS via `navigator.geolocation.getCurrentPosition`; block submission if unavailable
+    - File input (`accept="image/*"`) required before submit; block and show error if missing
+    - On submit: obtain pre-signed URL from `POST /upload-url`; PUT photo to S3; call `POST /garbage-reports` with returned `photoUrl` and coords
+    - Show points awarded on success
+    - _Requirements: 6.1, 6.2, 6.7, 6.8_
+  - [ ]* 14.2 Write unit test for garbage report validation
+    - Test: no photo → error shown, API not called; no GPS → error shown, API not called
+    - _Requirements: 6.2, 6.7, 6.8_
+
+- [ ] 15. Frontend: Profile tab
+  - [ ] 15.1 Implement `ProfileTab` component
+    - Display display name, district, total points, check-in count, report count, district rank
+    - Fetch `GET /residents/me/points`; show most recent 20 transactions (type, individual_points, building_points, timestamp)
+    - "Sign Out" button calls `clearSession()` and redirects to `/onboarding`
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - [ ]* 15.2 Write unit test for sign-out flow
+    - Test: tapping Sign Out clears localStorage session and navigates to onboarding
+    - _Requirements: 1.6, 10.5_
+
+- [ ] 16. Frontend: Credits Dashboard tab
+  - [ ] 16.1 Implement `CreditsDashboardTab` component
+    - Fetch `GET /residents/me`; display current Individual_Points balance, total earned, total redeemed, and Residential_Area Building_Points balance
+    - Display available Octopus card redemption tiers (points cost + HKD value)
+    - Display motivational message showing points needed to reach next tier
+    - Fetch `GET /residential-areas/leaderboard?districtId=...`; display top-5 residential areas within the resident's district ranked by building_points
+    - _Requirements: 13.1, 13.2, 13.11, 13.12, 14.4_
+  - [ ] 16.2 Implement redemption flow
+    - Tier selection + confirm button calls `POST /credits/redeem`; handle 422 (show current vs required balance); show updated balance and confirmation ID on success
+    - _Requirements: 13.3, 13.4, 13.5, 13.7_
+  - [ ] 16.3 Implement redemption history list
+    - Fetch `GET /credits/redemptions`; display tier, HKD value, points deducted, timestamp for each past redemption
+    - _Requirements: 13.8, 13.9_
+  - [ ]* 16.4 Write unit test for redemption flow error states
+    - Test: insufficient balance → 422 shows current and required balance; success → updated balance displayed
+    - _Requirements: 13.5, 13.7_
+
+- [ ] 17. Frontend: Bin Request form
+  - [ ] 17.1 Implement `BinRequestForm` component (modal/sheet)
+    - Capture GPS automatically; optional description text input
+    - On submit: call `POST /bin-requests`; show confirmation on success
+    - Accessible from Map_Tab toolbar and Dashboard_Tab
+    - _Requirements: 12.1, 12.2, 12.3, 12.6_
+  - [ ]* 17.2 Write unit test for bin request submission
+    - Test: no GPS → error shown, API not called; valid submission → confirmation shown
+    - _Requirements: 12.1, 12.3_
+
+- [ ] 18. Final checkpoint — full stack
+  - Ensure all backend and frontend tests pass. Verify `GET /health` returns ingestion status, the tab router guards unauthenticated access, the check-in flow returns both individual and building points, the Credits Dashboard displays redemption tiers, and the Map tab shows the live stats overlay and underserved shading. Ask the user if questions arise.
+
+## Notes
+
+- Tasks marked with `*` are optional and can be skipped for a faster MVP
+- Each task references specific requirements for traceability
+- All 30 correctness properties from the design are covered by property-based tests (Properties 1–30)
+- Property tests use `fast-check` with a minimum of 100 iterations each
+- Each property test must include the comment: `// Feature: green-loop-app, Property N: <property_text>`
+- Unit tests cover integration points and edge cases not already covered by property tests
