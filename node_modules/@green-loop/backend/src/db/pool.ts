@@ -2,6 +2,10 @@ import pg from 'pg';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import dotenv from 'dotenv';
+import dns from 'dns';
+
+// Force IPv4 DNS resolution — Railway does not support IPv6
+dns.setDefaultResultOrder('ipv4first');
 
 // Load .env from repo root — safe to call multiple times (dotenv is idempotent)
 const __filename = fileURLToPath(import.meta.url);
@@ -12,14 +16,12 @@ let _pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool {
   if (!_pool) {
+    const dbUrl = process.env['DATABASE_URL'] ?? '';
     _pool = new pg.Pool({
-      connectionString: process.env['DATABASE_URL'],
+      connectionString: dbUrl,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
-      // Supabase requires SSL; rejectUnauthorized=false avoids cert issues on Railway
-      ssl: process.env['DATABASE_URL']?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
-      // Force IPv4 — Railway does not support IPv6
-      family: 4,
+      ssl: dbUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
     });
 
     _pool.on('error', (err) => {
