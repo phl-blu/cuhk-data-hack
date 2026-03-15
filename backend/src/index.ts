@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import pool from './db/pool.js';
@@ -16,6 +17,11 @@ import residentialAreasRouter from './routes/residentialAreas.js';
 
 const app = express();
 
+const corsOrigin = process.env['CORS_ORIGIN'];
+app.use(cors({
+  origin: corsOrigin ? corsOrigin.split(',').map(s => s.trim()) : '*',
+  credentials: true,
+}));
 app.use(express.json());
 app.use(requestIdMiddleware);
 
