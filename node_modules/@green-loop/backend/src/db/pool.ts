@@ -18,6 +18,8 @@ function getPool(): pg.Pool {
       idleTimeoutMillis: 30000,
       // Supabase requires SSL; rejectUnauthorized=false avoids cert issues on Railway
       ssl: process.env['DATABASE_URL']?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+      // Force IPv4 — Railway does not support IPv6
+      family: 4,
     });
 
     _pool.on('error', (err) => {

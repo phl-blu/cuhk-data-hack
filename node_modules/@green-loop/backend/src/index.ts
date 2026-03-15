@@ -18,8 +18,19 @@ import residentialAreasRouter from './routes/residentialAreas.js';
 const app = express();
 
 const corsOrigin = process.env['CORS_ORIGIN'];
+const allowedOrigins = corsOrigin ? corsOrigin.split(',').map(s => s.trim()) : null;
 app.use(cors({
-  origin: corsOrigin ? corsOrigin.split(',').map(s => s.trim()) : '*',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // If no CORS_ORIGIN set, allow all
+    if (!allowedOrigins) return callback(null, true);
+    // Allow exact matches
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow any vercel.app subdomain (covers preview deployments)
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
 }));
 app.use(express.json());
