@@ -54,7 +54,7 @@ export default function OnboardingScreen() {
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2rem 1.5rem', background: '#f0fdf4' }}>
       <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
         <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>♻️</div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>Green Loop</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>iAm Green</h1>
         <p style={{ color: '#6b7280', marginTop: '0.5rem' }}>Recycle. Earn. Make HK greener.</p>
       </div>
 
