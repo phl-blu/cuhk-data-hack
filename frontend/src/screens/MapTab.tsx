@@ -112,6 +112,7 @@ function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number)
 }
 
 export default function MapTab() {
+  const SORT_VIDEO_URL = 'https://pub-ba057842350a47009e5a2d1d6637465a.r2.dev/copy_78F751B6-1B51-44D5-B84F-71ED74BAB6EB.mp4';
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('mapbox-gl').Map | null>(null);
   const markersRef = useRef<import('mapbox-gl').Marker[]>([]);
@@ -126,6 +127,7 @@ export default function MapTab() {
   const [reportPopup, setReportPopup] = useState<ReportPopupInfo | null>(null);
   const [checkinMsg, setCheckinMsg] = useState<string | null>(null);
   const [showBinModal, setShowBinModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
   const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -545,6 +547,19 @@ export default function MapTab() {
         </div>
       )}
 
+      {/* Sort Item button — top left */}
+      <button
+        onClick={() => setShowSortModal(true)}
+        style={{
+          position: 'absolute', top: '1rem', left: '1rem',
+          background: '#fff', color: '#374151', borderRadius: '8px',
+          padding: '0.5rem 0.75rem', fontSize: '0.8rem', fontWeight: 600,
+          boxShadow: '0 1px 6px rgba(0,0,0,0.2)', zIndex: 10,
+        }}
+      >
+        ♻️ Sort Item
+      </button>
+
       {/* Request Bin button — always visible */}
       <button
         onClick={() => setShowBinModal(true)}
@@ -557,6 +572,53 @@ export default function MapTab() {
       >
         🗑️ Request Bin
       </button>
+
+      {/* Sort Item modal */}
+      {showSortModal && (
+        <div
+          onClick={() => setShowSortModal(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: '16px', padding: '1.25rem',
+              width: '100%', maxWidth: '480px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ fontWeight: 700, fontSize: '1rem' }}>♻️ How to Sort Items</div>
+              <button
+                onClick={() => setShowSortModal(false)}
+                style={{ background: 'none', fontSize: '1.4rem', color: '#9ca3af', padding: 0, lineHeight: 1 }}
+                aria-label="Close"
+              >×</button>
+            </div>
+            {SORT_VIDEO_URL ? (
+              <video
+                controls
+                playsInline
+                style={{ width: '100%', borderRadius: '10px', background: '#000' }}
+              >
+                <source src={SORT_VIDEO_URL} type="video/mp4" />
+                Your browser does not support video playback.
+              </video>
+            ) : (
+              <div style={{
+                background: '#f3f4f6', borderRadius: '10px', padding: '2rem',
+                textAlign: 'center', color: '#9ca3af', fontSize: '0.9rem',
+              }}>
+                🎬 Video coming soon
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Check-in / error message toast */}
       {checkinMsg && (
