@@ -1,4 +1,6 @@
-const BASE_URL = '/api';
+const BASE_URL = (import.meta.env['VITE_API_BASE_URL'] as string | undefined)
+  ? `${import.meta.env['VITE_API_BASE_URL'] as string}/api`
+  : '/api';
 
 function getSessionToken(): string | null {
   try {

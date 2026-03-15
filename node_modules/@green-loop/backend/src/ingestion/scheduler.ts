@@ -55,6 +55,10 @@ async function fetchOpenSpace(): Promise<OpenSpaceRaw[]> {
     'https://portal.csdi.gov.hk/server/services/common/epd_rcd_1669597014943_12158/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=OS_POLYGON_INV_EPD&outputFormat=geojson&count=5000';
   try {
     const features = await fetchGeoJson(url);
+    console.log(`[ingestion] open_space raw feature count: ${features.length}`);
+    if (features.length > 0) {
+      console.log(`[ingestion] open_space sample properties:`, JSON.stringify(features[0]?.properties));
+    }
     return features.map((f) => {
       const p = f.properties;
       const coords = extractCoords(f.geometry);
@@ -77,6 +81,11 @@ async function fetchRecyclableCollection(): Promise<RecyclableCollectionRaw[]> {
     'https://portal.csdi.gov.hk/server/services/common/epd_rcd_1630899452408_9505/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=geotagging&outputFormat=geojson&count=5000';
   try {
     const features = await fetchGeoJson(url);
+    console.log(`[ingestion] recyclable_collection raw feature count: ${features.length}`);
+    if (features.length > 0) {
+      console.log(`[ingestion] recyclable_collection sample properties:`, JSON.stringify(features[0]?.properties));
+      console.log(`[ingestion] recyclable_collection sample geometry:`, JSON.stringify(features[0]?.geometry));
+    }
     return features.map((f) => {
       const p = f.properties;
       const coords = extractCoords(f.geometry);

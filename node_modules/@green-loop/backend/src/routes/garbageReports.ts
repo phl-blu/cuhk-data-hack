@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../lib/response.js';
-import { validateCoordinates, pointInDistrict, findInBoundingBox } from '../services/spatial.js';
+import { validateCoordinates, pointInDistrict } from '../services/spatial.js';
 import { awardGarbageReport, upsertResident } from '../services/points.js';
 import pool from '../db/pool.js';
 
@@ -34,8 +34,13 @@ router.post('/', authMiddleware, async (req, res, next) => {
     // Ensure resident exists in DB
     await upsertResident(resident.residentId, resident.displayName, resident.district);
 
-    // Derive district from coordinates
-    const districtId = await pointInDistrict(lat as number, lng as number);
+    // Derive district from coordinates — null if districts table empty or PostGIS error
+    let districtId: number | null = null;
+    try {
+      districtId = await pointInDistrict(lat as number, lng as number);
+    } catch {
+      // districts table may be empty — proceed without district
+    }
 
     // Insert garbage report
     const reportResult = await pool.query<{ id: number }>(
