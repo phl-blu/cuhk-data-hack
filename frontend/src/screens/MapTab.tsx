@@ -128,6 +128,7 @@ export default function MapTab() {
   const [showBinModal, setShowBinModal] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
+  const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // Determine initial center: nav state > device location > district centroid > default
   function getInitialCenter(): Promise<[number, number]> {
@@ -169,10 +170,12 @@ export default function MapTab() {
         points = FALLBACK_POINTS;
       }
 
-      // Recalculate real distance for every point using actual user location
+      // Recalculate real distance using user's actual GPS position (not map center)
+      const userLat = userPosRef.current?.lat ?? lat;
+      const userLng = userPosRef.current?.lng ?? lng;
       points = points.map((pt) => ({
         ...pt,
-        distanceMetres: haversineMetres(lat, lng, pt.lat, pt.lng),
+        distanceMetres: haversineMetres(userLat, userLng, pt.lat, pt.lng),
       }));
       // Sort nearest first
       points.sort((a, b) => a.distanceMetres - b.distanceMetres);
@@ -333,6 +336,7 @@ export default function MapTab() {
 
         const center = await getInitialCenter();
         if (destroyed) return;
+        userPosRef.current = { lat: center[1], lng: center[0] };
 
         map = new mapboxgl.Map({
           container: mapContainerRef.current,
@@ -363,6 +367,7 @@ export default function MapTab() {
         const watchId = navigator.geolocation.watchPosition(
           (pos) => {
             const lngLat: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+            userPosRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             userMarkerRef.current?.setLngLat(lngLat);
           },
           () => { /* ignore — marker stays at initial center */ },
