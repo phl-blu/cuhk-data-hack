@@ -17,6 +17,16 @@ export function getFillCategory(pct: number): { label: string; color: string } {
   return           { label: 'Full',   color: '#dc2626' };
 }
 
+// Haversine distance in metres between two lat/lng points
+function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // Fallback collection points — shown when DB is empty or API unreachable
 const FALLBACK_POINTS: CollectionPoint[] = [
   { id: 1,  name: 'Wan Chai Recycling Station',       accessTier: 'basic',   materials: ['Paper','Plastic','Metal'], lat: 22.2783, lng: 114.1825, distanceMetres: 200 },
@@ -158,6 +168,14 @@ export default function MapTab() {
       if (points.length === 0) {
         points = FALLBACK_POINTS;
       }
+
+      // Recalculate real distance for every point using actual user location
+      points = points.map((pt) => ({
+        ...pt,
+        distanceMetres: haversineMetres(lat, lng, pt.lat, pt.lng),
+      }));
+      // Sort nearest first
+      points.sort((a, b) => a.distanceMetres - b.distanceMetres);
 
       // Remove old CP markers
       markersRef.current = markersRef.current.filter((m) => {
