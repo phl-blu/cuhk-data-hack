@@ -114,6 +114,20 @@ export default function ProfileTab() {
         )}
       </div>
 
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>🐙 Octopus Card</div>
+          <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.2rem' }}>Link to redeem points automatically</div>
+        </div>
+        <button
+          className="btn-secondary"
+          style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
+          onClick={() => alert('Octopus Card linking coming soon!')}
+        >
+          Link Card
+        </button>
+      </div>
+
       <button className="btn-secondary" onClick={handleSignOut} style={{ marginTop: '0.5rem' }}>
         🚪 Sign Out
       </button>
