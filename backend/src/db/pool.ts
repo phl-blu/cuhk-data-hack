@@ -14,6 +14,14 @@ function getPool(): pg.Pool {
   if (!_pool) {
     _pool = new pg.Pool({
       connectionString: process.env['DATABASE_URL'],
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      // Supabase requires SSL; rejectUnauthorized=false avoids cert issues on Railway
+      ssl: process.env['DATABASE_URL']?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+    });
+
+    _pool.on('error', (err) => {
+      console.error('[db] Pool error (idle client):', err.message);
     });
   }
   return _pool;

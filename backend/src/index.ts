@@ -37,15 +37,8 @@ app.post('/admin/ingest', async (_req, res) => {
   }
 });
 
-app.get('/health', async (_req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT dataset_name, last_ingested, record_count, status FROM dataset_ingestion_status`
-    );
-    res.json({ data: { status: 'ok', datasets: result.rows } });
-  } catch {
-    res.json({ data: { status: 'ok', datasets: [] } });
-  }
+app.get('/health', (_req, res) => {
+  res.json({ data: { status: 'ok' } });
 });
 
 app.use('/api/checkins', checkinsRouter);
