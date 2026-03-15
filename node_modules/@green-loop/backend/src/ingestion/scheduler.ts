@@ -133,16 +133,25 @@ async function upsertCollectionPoints(
 ): Promise<void> {
   if (records.length === 0) return;
 
-  for (const r of records) {
+  // Batch upsert in chunks of 200 to avoid parameter limits and pool exhaustion
+  const CHUNK = 200;
+  for (let i = 0; i < records.length; i += CHUNK) {
+    const chunk = records.slice(i, i + CHUNK);
+    const values: unknown[] = [];
+    const placeholders = chunk.map((r, idx) => {
+      const base = idx * 7;
+      values.push(r.sourceId, r.source, r.name, r.accessTier, r.materials, r.lng, r.lat);
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, ST_SetSRID(ST_MakePoint($${base + 6}, $${base + 7}), 4326))`;
+    });
     await pool.query(
       `INSERT INTO collection_points (source_id, source, name, access_tier, materials, location)
-       VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326))
+       VALUES ${placeholders.join(', ')}
        ON CONFLICT (source_id) DO UPDATE
          SET name        = EXCLUDED.name,
              access_tier = EXCLUDED.access_tier,
              materials   = EXCLUDED.materials,
              updated_at  = NOW()`,
-      [r.sourceId, r.source, r.name, r.accessTier, r.materials, r.lng, r.lat]
+      values
     );
   }
 }

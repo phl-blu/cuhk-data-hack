@@ -21,6 +21,7 @@ function getPool(): pg.Pool {
       connectionString: dbUrl,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
+      max: 5, // Supabase free tier has low connection limits
       ssl: dbUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
     });
 
