@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import MaterialCamera from '../components/MaterialCamera';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import { apiClient, ApiError } from '../api/client';
@@ -112,7 +113,6 @@ function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number)
 }
 
 export default function MapTab() {
-  const SORT_VIDEO_URL = 'https://pub-ba057842350a47009e5a2d1d6637465a.r2.dev/copy_78F751B6-1B51-44D5-B84F-71ED74BAB6EB.mp4';
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('mapbox-gl').Map | null>(null);
   const markersRef = useRef<import('mapbox-gl').Marker[]>([]);
@@ -433,8 +433,8 @@ export default function MapTab() {
           const center = map.getCenter();
           const dLat = Math.abs(center.lat - lastFetchCenter.lat);
           const dLng = Math.abs(center.lng - lastFetchCenter.lng);
-          // ~0.003 degrees ≈ 300m — skip if barely moved
-          if (dLat < 0.003 && dLng < 0.003) return;
+          // ~0.008 degrees ≈ 800m — skip if barely moved
+          if (dLat < 0.008 && dLng < 0.008) return;
           lastFetchCenter = center;
           const bounds = map.getBounds();
           void fetchCollectionPoints(map, center.lat, center.lng);
@@ -442,7 +442,7 @@ export default function MapTab() {
             void fetchGarbageReports(map, bounds);
             void fetchStats(bounds);
           }
-        }, 800);
+        }, 1500);
 
         map.on('moveend', onMoveEnd);
 
@@ -599,23 +599,9 @@ export default function MapTab() {
                 aria-label="Close"
               >×</button>
             </div>
-            {SORT_VIDEO_URL ? (
-              <video
-                controls
-                playsInline
-                style={{ width: '100%', borderRadius: '10px', background: '#000' }}
-              >
-                <source src={SORT_VIDEO_URL} type="video/mp4" />
-                Your browser does not support video playback.
-              </video>
-            ) : (
-              <div style={{
-                background: '#f3f4f6', borderRadius: '10px', padding: '2rem',
-                textAlign: 'center', color: '#9ca3af', fontSize: '0.9rem',
-              }}>
-                🎬 Video coming soon
-              </div>
-            )}
+            <div style={{ width: '100%', height: '320px', borderRadius: '10px', overflow: 'hidden' }}>
+              <MaterialCamera />
+            </div>
           </div>
         </div>
       )}
