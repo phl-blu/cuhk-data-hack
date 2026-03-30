@@ -81,7 +81,7 @@ export default function DashboardTab() {
     setLoading(true);
 
     apiClient
-      .get<{ data: ResidentProfile }>('/residents/me')
+      .get<{ data: ResidentProfile }>('/residents/me', true)
       .then((res) => setProfile(res.data))
       .catch(() => {/* handled by loading state */})
       .finally(() => setLoading(false));

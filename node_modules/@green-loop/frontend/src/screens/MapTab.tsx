@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import MaterialCamera from '../components/MaterialCamera';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Feature, FeatureCollection, Point } from 'geojson';
@@ -328,7 +329,7 @@ export default function MapTab() {
     async function initMap() {
       try {
         const mapboxgl = (await import('mapbox-gl')).default;
-        await import('mapbox-gl/dist/mapbox-gl.css');
+        // CSS is imported statically at the top of this module
 
         mapboxgl.accessToken = (import.meta.env['VITE_MAPBOX_TOKEN'] as string)
           || localStorage.getItem('mapbox_token')

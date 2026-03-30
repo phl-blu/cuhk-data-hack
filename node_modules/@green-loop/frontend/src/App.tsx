@@ -1,13 +1,22 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import OnboardingScreen from './screens/OnboardingScreen';
-import LeaderboardTab from './screens/LeaderboardTab';
-import DashboardTab from './screens/DashboardTab';
-import MapTab from './screens/MapTab';
-import GarbageReportTab from './screens/GarbageReportTab';
-import CreditsTab from './screens/CreditsTab';
-import ProfileTab from './screens/ProfileTab';
+
+const LeaderboardTab = lazy(() => import('./screens/LeaderboardTab'));
+const DashboardTab = lazy(() => import('./screens/DashboardTab'));
+const MapTab = lazy(() => import('./screens/MapTab'));
+const GarbageReportTab = lazy(() => import('./screens/GarbageReportTab'));
+const CreditsTab = lazy(() => import('./screens/CreditsTab'));
+const ProfileTab = lazy(() => import('./screens/ProfileTab'));
+
+function TabFallback() {
+  return (
+    <div className="screen" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+      Loading…
+    </div>
+  );
+}
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
@@ -68,16 +77,18 @@ function TabBar() {
 export default function App() {
   return (
     <>
-      <Routes>
-        <Route path="/onboarding" element={<OnboardingScreen />} />
-        <Route path="/" element={<AuthGuard><LeaderboardTab /></AuthGuard>} />
-        <Route path="/dashboard" element={<AuthGuard><DashboardTab /></AuthGuard>} />
-        <Route path="/map" element={<AuthGuard><MapTab /></AuthGuard>} />
-        <Route path="/report" element={<AuthGuard><GarbageReportTab /></AuthGuard>} />
-        <Route path="/credits" element={<AuthGuard><CreditsTab /></AuthGuard>} />
-        <Route path="/profile" element={<AuthGuard><ProfileTab /></AuthGuard>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<TabFallback />}>
+        <Routes>
+          <Route path="/onboarding" element={<OnboardingScreen />} />
+          <Route path="/" element={<AuthGuard><LeaderboardTab /></AuthGuard>} />
+          <Route path="/dashboard" element={<AuthGuard><DashboardTab /></AuthGuard>} />
+          <Route path="/map" element={<AuthGuard><MapTab /></AuthGuard>} />
+          <Route path="/report" element={<AuthGuard><GarbageReportTab /></AuthGuard>} />
+          <Route path="/credits" element={<AuthGuard><CreditsTab /></AuthGuard>} />
+          <Route path="/profile" element={<AuthGuard><ProfileTab /></AuthGuard>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       <TabBar />
     </>
   );

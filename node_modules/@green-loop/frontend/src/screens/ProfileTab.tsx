@@ -115,24 +115,19 @@ export default function ProfileTab() {
       </div>
 
       <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <img
-            src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9a/Octopus_card_logo.svg/200px-Octopus_card_logo.svg.png"
-            alt="Octopus Card"
-            style={{ width: '48px', height: 'auto' }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Octopus Card</div>
-            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.2rem' }}>Link to redeem points automatically</div>
-          </div>
-        </div>
+        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>Link to redeem points automatically</div>
         <button
           className="btn-secondary"
-          style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
           onClick={() => alert('Octopus Card linking coming soon!')}
         >
-          Link Card
+          <img
+            src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9a/Octopus_card_logo.svg/120px-Octopus_card_logo.svg.png"
+            alt="Octopus"
+            style={{ height: '20px', width: 'auto' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+          <span style={{ fontSize: '0.8rem' }}>Link now</span>
         </button>
       </div>
 

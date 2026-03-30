@@ -33,7 +33,7 @@ export default function LeaderboardTab() {
 
   useEffect(() => {
     apiClient
-      .get<{ data: { leaderboard: LeaderboardEntry[] } }>('/leaderboard')
+      .get<{ data: { leaderboard: LeaderboardEntry[] } }>('/leaderboard', true)
       .then((res) => {
         const data = res.data.leaderboard;
         setEntries(data && data.length > 0 ? data : PLACEHOLDER_ENTRIES);

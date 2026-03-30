@@ -2,6 +2,10 @@ const BASE_URL = (import.meta.env['VITE_API_BASE_URL'] as string | undefined)
   ? `${import.meta.env['VITE_API_BASE_URL'] as string}/api`
   : '/api';
 
+// Simple in-memory cache for GET requests
+const _cache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_TTL = 30_000; // 30 seconds
+
 function getSessionToken(): string | null {
   try {
     const raw = localStorage.getItem('gl_session');
@@ -53,8 +57,15 @@ export class ApiError extends Error {
 }
 
 export const apiClient = {
-  get<T>(path: string): Promise<T> {
-    return request<T>(path);
+  get<T>(path: string, cacheable = false): Promise<T> {
+    if (cacheable) {
+      const hit = _cache.get(path);
+      if (hit && Date.now() - hit.ts < CACHE_TTL) return Promise.resolve(hit.data as T);
+    }
+    return request<T>(path).then((data) => {
+      if (cacheable) _cache.set(path, { data, ts: Date.now() });
+      return data;
+    });
   },
   post<T>(path: string, body?: unknown): Promise<T> {
     return request<T>(path, {
