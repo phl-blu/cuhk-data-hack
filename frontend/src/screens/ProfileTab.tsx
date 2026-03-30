@@ -131,7 +131,7 @@ export default function ProfileTab() {
       </div>
 
       <button className="btn-secondary" onClick={handleSignOut} style={{ marginTop: '0.5rem' }}>
-        🚪 Sign Out
+        Sign Out
       </button>
     </div>
   );
