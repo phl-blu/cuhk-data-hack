@@ -5,7 +5,8 @@ export interface ClassificationResult {
   confidence: number;
 }
 
-const WS_URL = 'ws://localhost:8001/ws/classify';
+const WS_URL = (import.meta.env['VITE_SORTER_WS_URL'] as string | undefined)
+  || 'ws://material-sorter-production.up.railway.app/ws/classify';
 
 export default function MaterialCamera() {
   const videoRef = useRef<HTMLVideoElement>(null);
