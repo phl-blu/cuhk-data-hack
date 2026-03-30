@@ -36,7 +36,7 @@ app.use(cors({
 app.use(express.json());
 app.use(requestIdMiddleware);
 
-app.post('/admin/ingest', async (_req, res) => {
+app.post('/api/admin/ingest', async (_req, res) => {
   try {
     await runIngestion();
     const result = await pool.query(
@@ -52,16 +52,16 @@ app.get('/health', (_req, res) => {
   res.json({ data: { status: 'ok' } });
 });
 
-app.use('/checkins', checkinsRouter);
-app.use('/garbage-reports', garbageReportsRouter);
-app.use('/collection-points', collectionPointsRouter);
-app.use('/leaderboard', leaderboardRouter);
-app.use('/residents', residentsRouter);
-app.use('/upload-url', uploadRouter);
-app.use('/map/stats', mapStatsRouter);
-app.use('/bin-requests', binRequestsRouter);
-app.use('/credits', creditsRouter);
-app.use('/residential-areas', residentialAreasRouter);
+app.use('/api/checkins', checkinsRouter);
+app.use('/api/garbage-reports', garbageReportsRouter);
+app.use('/api/collection-points', collectionPointsRouter);
+app.use('/api/leaderboard', leaderboardRouter);
+app.use('/api/residents', residentsRouter);
+app.use('/api/upload-url', uploadRouter);
+app.use('/api/map/stats', mapStatsRouter);
+app.use('/api/bin-requests', binRequestsRouter);
+app.use('/api/credits', creditsRouter);
+app.use('/api/residential-areas', residentialAreasRouter);
 
 // Global error handler — must be last
 app.use(errorHandler);
