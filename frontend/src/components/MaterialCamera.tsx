@@ -5,8 +5,17 @@ export interface ClassificationResult {
   confidence: number;
 }
 
-const WS_URL = (import.meta.env['VITE_SORTER_WS_URL'] as string | undefined)
-  || 'ws://material-sorter-production.up.railway.app/ws/classify';
+// Auto-upgrade ws:// to wss:// when page is served over HTTPS
+function getSorterWsUrl(): string {
+  const url = (import.meta.env['VITE_SORTER_WS_URL'] as string | undefined)
+    || 'wss://material-sorter-production.up.railway.app/ws/classify';
+  if (window.location.protocol === 'https:' && url.startsWith('ws://')) {
+    return url.replace('ws://', 'wss://');
+  }
+  return url;
+}
+
+const WS_URL = getSorterWsUrl();
 
 export default function MaterialCamera() {
   const videoRef = useRef<HTMLVideoElement>(null);

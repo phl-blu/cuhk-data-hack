@@ -122,10 +122,9 @@ export default function ProfileTab() {
           onClick={() => alert('Octopus Card linking coming soon!')}
         >
           <img
-            src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9a/Octopus_card_logo.svg/120px-Octopus_card_logo.svg.png"
+            src="/octopus-logo.png"
             alt="Octopus"
-            style={{ height: '20px', width: 'auto' }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            style={{ height: '22px', width: 'auto' }}
           />
           <span style={{ fontSize: '0.8rem' }}>Link now</span>
         </button>
