@@ -75,8 +75,27 @@ function TabBar() {
 }
 
 export default function App() {
+  const { session } = useAuth();
   return (
     <>
+      {session && (
+        <div style={{
+          background: '#2e7d32',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.6rem 1rem',
+          borderBottom: '3px solid #81c784',
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: '1.1rem' }}>♻️</span>
+          <span style={{ fontWeight: 800, fontSize: '0.95rem', letterSpacing: '0.01em' }}>iAM Green</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.68rem', opacity: 0.7, letterSpacing: '0.03em' }}>
+            Recycling Rewards
+          </span>
+        </div>
+      )}
       <Suspense fallback={<TabFallback />}>
         <Routes>
           <Route path="/onboarding" element={<OnboardingScreen />} />
