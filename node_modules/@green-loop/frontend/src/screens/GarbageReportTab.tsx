@@ -91,12 +91,14 @@ export default function GarbageReportTab() {
   if (success) {
     return (
       <div className="screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
-        <h3 style={{ fontWeight: 700 }}>Report submitted!</h3>
-        <p style={{ color: '#15803d', fontWeight: 700, fontSize: '1.2rem', margin: '0.5rem 0' }}>
+        <div style={{ width: 72, height: 72, borderRadius: 20, background: '#D9F3E5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, marginBottom: 16 }}>
+          ✅
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 20, color: '#0F2D1C', marginBottom: 6 }}>Report Submitted</div>
+        <div style={{ color: '#2AA962', fontWeight: 700, fontSize: 17, marginBottom: 20 }}>
           +{success.pointsAwarded} points earned
-        </p>
-        <button className="btn-primary" style={{ marginTop: '1rem', maxWidth: '200px' }} onClick={() => setSuccess(null)}>
+        </div>
+        <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setSuccess(null)}>
           Submit Another
         </button>
       </div>
@@ -105,47 +107,43 @@ export default function GarbageReportTab() {
 
   return (
     <div className="screen">
-      <h2 style={{ fontWeight: 700, marginBottom: '1rem' }}>📷 Report Garbage</h2>
+      <div className="section-heading">Report Garbage</div>
 
-      {gpsError && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem', color: '#dc2626' }}>
-          {gpsError}
-        </div>
-      )}
+      {gpsError && <div className="alert-error">{gpsError}</div>}
 
       {lat !== null && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.5rem 0.75rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#15803d' }}>
+        <div className="alert-success" style={{ fontWeight: 400 }}>
           📍 Location captured ({lat.toFixed(4)}, {lng?.toFixed(4)})
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-            Photo <span style={{ color: '#dc2626' }}>*</span>
-          </label>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-            style={errors.photo ? { borderColor: '#dc2626' } : {}}
-          />
-          {errors.photo && <p className="error-text">{errors.photo}</p>}
-          {photo && (
-            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
-              Selected: {photo.name}
-            </p>
-          )}
-        </div>
+      <div className="card">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 13, color: '#4D7060' }}>
+              Photo <span style={{ color: '#B91C1C' }}>*</span>
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              style={errors.photo ? { borderColor: '#B91C1C' } : {}}
+            />
+            {errors.photo && <p className="error-text">{errors.photo}</p>}
+            {photo && (
+              <p style={{ fontSize: 12, color: '#8AAD96', marginTop: 4 }}>Selected: {photo.name}</p>
+            )}
+          </div>
 
-        {errors.gps && <p className="error-text">{errors.gps}</p>}
-        {submitError && <p className="error-text">{submitError}</p>}
+          {errors.gps && <p className="error-text">{errors.gps}</p>}
+          {submitError && <p className="error-text">{submitError}</p>}
 
-        <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? 'Submitting…' : '📤 Submit Report'}
-        </button>
-      </form>
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? 'Submitting…' : 'Submit Report'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

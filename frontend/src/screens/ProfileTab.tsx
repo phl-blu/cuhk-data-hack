@@ -48,7 +48,7 @@ export default function ProfileTab() {
   if (loading) {
     return (
       <div className="screen">
-        <h2 style={{ fontWeight: 700, marginBottom: '1rem' }}>👤 Profile</h2>
+        <div className="section-heading">Profile</div>
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="card">
             <div className="skeleton" style={{ width: '60%' }} />
@@ -61,76 +61,77 @@ export default function ProfileTab() {
 
   return (
     <div className="screen">
-      <h2 style={{ fontWeight: 700, marginBottom: '1rem' }}>👤 Profile</h2>
+      <div className="section-heading">Profile</div>
 
       {profile && (
         <div className="card">
-          <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{profile.displayName}</div>
-          <div style={{ color: '#6b7280', marginBottom: '0.75rem' }}>{profile.district}</div>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '1.4rem', color: '#15803d' }}>{profile.totalPoints}</div>
-              <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Total Points</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 16, background: '#D9F3E5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+              👤
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '1.4rem', color: '#1d4ed8' }}>#{profile.districtRank}</div>
-              <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>District Rank</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{profile.displayName}</div>
+              <div style={{ color: '#4D7060', fontSize: 13 }}>{profile.district} District</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '1.4rem' }}>{profile.checkinCount}</div>
-              <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Check-ins</div>
+          </div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div>
+              <div className="stat-value">{profile.totalPoints.toLocaleString()}</div>
+              <div className="stat-label">Total Points</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '1.4rem' }}>{profile.reportCount}</div>
-              <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Reports</div>
+            <div>
+              <div className="stat-value" style={{ color: '#D4A020' }}>#{profile.districtRank}</div>
+              <div className="stat-label">District Rank</div>
+            </div>
+            <div>
+              <div className="stat-value" style={{ color: '#0F2D1C' }}>{profile.checkinCount}</div>
+              <div className="stat-label">Check-ins</div>
+            </div>
+            <div>
+              <div className="stat-value" style={{ color: '#0F2D1C' }}>{profile.reportCount}</div>
+              <div className="stat-label">Reports</div>
             </div>
           </div>
         </div>
       )}
 
       <div className="card">
-        <div style={{ fontWeight: 600, marginBottom: '0.75rem' }}>Recent Activity</div>
+        <div className="card-label">Recent Activity</div>
         {transactions.length === 0 ? (
-          <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>No transactions yet. Start recycling!</p>
+          <p style={{ color: '#8AAD96', fontSize: 13 }}>No transactions yet. Start recycling!</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {transactions.slice(0, 20).map((tx) => (
-              <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #f3f4f6' }}>
-                <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                    {tx.transactionType === 'checkin' ? '✅ Check-in' : '📷 Garbage Report'}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                    {new Date(tx.createdAt).toLocaleString()}
-                  </div>
+          transactions.slice(0, 20).map((tx) => (
+            <div key={tx.id} className="info-row">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#0F2D1C' }}>
+                  {tx.transactionType === 'checkin' ? 'Check-in' : 'Garbage Report'}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700, color: '#15803d' }}>+{tx.points} pts</div>
-                  <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>🏢 +{tx.buildingPoints}</div>
+                <div style={{ fontSize: 11, color: '#8AAD96' }}>
+                  {new Date(tx.createdAt).toLocaleString()}
                 </div>
               </div>
-            ))}
-          </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, color: '#2AA962', fontSize: 13 }}>+{tx.points} pts</div>
+                <div style={{ fontSize: 11, color: '#8AAD96' }}>+{tx.buildingPoints} bldg</div>
+              </div>
+            </div>
+          ))
         )}
       </div>
 
       <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>Link to redeem points automatically</div>
+        <div style={{ fontSize: 13, color: '#4D7060' }}>Link Octopus Card for auto-redemption</div>
         <button
           className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
+          style={{ width: 'auto', padding: '8px 16px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
           onClick={() => alert('Octopus Card linking coming soon!')}
         >
-          <img
-            src="/octopus-logo.png"
-            alt="Octopus"
-            style={{ height: '22px', width: 'auto' }}
-          />
-          <span style={{ fontSize: '0.8rem' }}>Link now</span>
+          <img src="/octopus-logo.png" alt="Octopus" style={{ height: 36, width: 'auto' }} />
+          <span>Link</span>
         </button>
       </div>
 
-      <button className="btn-secondary" onClick={handleSignOut} style={{ marginTop: '0.5rem' }}>
+      <button className="btn-secondary" onClick={handleSignOut} style={{ marginTop: 8 }}>
         Sign Out
       </button>
     </div>

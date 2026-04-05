@@ -122,7 +122,7 @@ export default function CreditsTab() {
   if (loading) {
     return (
       <div className="screen">
-        <h2 style={{ fontWeight: 700, marginBottom: '1rem' }}>💳 Credits</h2>
+        <div className="section-heading">Credits</div>
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="card">
             <div className="skeleton" style={{ width: '60%' }} />
@@ -138,63 +138,51 @@ export default function CreditsTab() {
 
   return (
     <div className="screen">
-      <h2 style={{ fontWeight: 700, marginBottom: '1rem' }}>💳 Credits</h2>
+      <div className="section-heading">💳 Credits</div>
 
       {/* Balance summary card */}
-      <div className="card" style={{ background: '#f0fdf4' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Balance</div>
-            <div style={{ fontWeight: 800, fontSize: '2rem', color: '#15803d' }}>{balance.toLocaleString()}</div>
-            <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>pts</div>
+      <div className="card" style={{ background: '#EFF9F3' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <div className="card-label">Balance</div>
+            <div className="stat-value">{balance.toLocaleString()}</div>
+            <div className="stat-label">pts</div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total Earned</div>
-            <div style={{ fontWeight: 700, fontSize: '1.4rem', color: '#374151' }}>{totalEarned.toLocaleString()}</div>
-            <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>pts</div>
+          <div>
+            <div className="card-label">Earned</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#0F2D1C' }}>{totalEarned.toLocaleString()}</div>
+            <div className="stat-label">pts</div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Redeemed</div>
-            <div style={{ fontWeight: 700, fontSize: '1.4rem', color: '#374151' }}>{totalRedeemed.toLocaleString()}</div>
-            <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>pts</div>
+          <div>
+            <div className="card-label">Redeemed</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#0F2D1C' }}>{totalRedeemed.toLocaleString()}</div>
+            <div className="stat-label">pts</div>
           </div>
         </div>
-
         {profile?.residentialAreaName && (
-          <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-              🏢 {profile.residentialAreaName}
-            </div>
-            <div style={{ fontWeight: 700, color: '#15803d', fontSize: '0.9rem' }}>
-              {(profile.residentialAreaBuildingPoints ?? 0).toLocaleString()} building pts
-            </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #B6E8CC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#4D7060' }}>🏢 {profile.residentialAreaName}</span>
+            <span style={{ fontWeight: 700, color: '#2AA962', fontSize: 13 }}>
+              {(profile.residentialAreaBuildingPoints ?? 0).toLocaleString()} bldg pts
+            </span>
           </div>
         )}
       </div>
 
-      {/* Motivational message */}
       {nextTier && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.85rem', color: '#92400e' }}>
-          🎯 Earn <strong>{nextTier.pointsNeeded}</strong> more points to redeem HK${nextTier.tier.hkd}!
+        <div className="alert-warn">
+          🎯 Earn <strong>{nextTier.pointsNeeded}</strong> more pts to redeem HK${nextTier.tier.hkd}
         </div>
       )}
       {!nextTier && balance >= TIERS[TIERS.length - 1]!.points && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.85rem', color: '#15803d' }}>
-          🏆 You've unlocked all redemption tiers. Keep recycling!
-        </div>
+        <div className="alert-success">🏆 All tiers unlocked. Keep recycling!</div>
       )}
-
-      {/* Feedback messages */}
-      {redeemMsg && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#15803d', fontWeight: 600 }}>
-          {redeemMsg}
-        </div>
-      )}
+      {redeemMsg && <div className="alert-success">{redeemMsg}</div>}
       {redeemError && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#dc2626' }}>
+        <div className="alert-error">
           {redeemError.message}
           {redeemError.current !== undefined && redeemError.required !== undefined && (
-            <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+            <div style={{ fontSize: 12, marginTop: 4 }}>
               Balance: {redeemError.current} pts · Required: {redeemError.required} pts
             </div>
           )}
@@ -202,18 +190,18 @@ export default function CreditsTab() {
       )}
 
       {/* Redemption tiers */}
-      <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Redeem for Octopus Card</div>
+      <div className="card-label" style={{ marginBottom: 8 }}>Redeem for Octopus Card</div>
       {TIERS.map(({ tier, points, hkd }) => {
         const canRedeem = balance >= points;
         return (
-          <div key={tier} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div key={tier} className={`tier-card${canRedeem ? '' : ' tier-card-locked'}`}>
             <div>
-              <div style={{ fontWeight: 700 }}>HK${hkd}</div>
-              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{points} points</div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: '#0F2D1C' }}>HK${hkd}</div>
+              <div style={{ fontSize: 12, color: '#8AAD96', marginTop: 2 }}>{points} points required</div>
             </div>
             <button
               className={canRedeem ? 'btn-primary' : 'btn-secondary'}
-              style={{ width: 'auto', padding: '0.5rem 1rem' }}
+              style={{ width: 'auto', padding: '8px 20px', fontSize: 13 }}
               disabled={!canRedeem || redeeming !== null}
               onClick={() => handleRedeem(tier, points, hkd)}
             >
@@ -223,30 +211,19 @@ export default function CreditsTab() {
         );
       })}
 
-      {/* Residential area leaderboard */}
+      {/* Building leaderboard */}
       {areaLeaderboard.length > 0 && (
         <>
-          <div style={{ fontWeight: 600, margin: '1rem 0 0.5rem' }}>
-            🏢 Top Buildings in {profile?.district}
+          <div className="card-label" style={{ marginTop: 20, marginBottom: 8 }}>
+            Top Buildings — {profile?.district}
           </div>
           {areaLeaderboard.map((area, idx) => (
-            <div
-              key={area.id}
-              className="card"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                background: idx === 0 ? '#fefce8' : undefined,
-              }}
-            >
-              <div style={{ fontWeight: 800, fontSize: '1.1rem', color: idx === 0 ? '#ca8a04' : idx === 1 ? '#9ca3af' : idx === 2 ? '#b45309' : '#6b7280', minWidth: '1.5rem', textAlign: 'center' }}>
-                {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${area.rank}`}
+            <div key={area.id} className="lb-row" style={idx === 0 ? { background: '#FFFBEE' } : {}}>
+              <div className="lb-rank" style={{ background: idx === 0 ? '#FEF0CC' : '#EFF9F3' }}>
+                {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : <span className="lb-rank-num">#{area.rank}</span>}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{area.name}</div>
-              </div>
-              <div style={{ fontWeight: 700, color: '#15803d', fontSize: '0.9rem' }}>
+              <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#0F2D1C' }}>{area.name}</div>
+              <div style={{ fontWeight: 700, color: '#2AA962', fontSize: 13 }}>
                 {area.totalBuildingPoints.toLocaleString()} pts
               </div>
             </div>
@@ -254,21 +231,17 @@ export default function CreditsTab() {
         </>
       )}
 
-      {/* Redemption history */}
+      {/* History */}
       {redemptions.length > 0 && (
         <>
-          <div style={{ fontWeight: 600, margin: '1rem 0 0.5rem' }}>Redemption History</div>
+          <div className="card-label" style={{ marginTop: 20, marginBottom: 8 }}>Redemption History</div>
           {redemptions.map((r) => (
-            <div key={r.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div key={r.id} className="info-row">
               <div>
-                <div style={{ fontWeight: 600 }}>HK${r.hkdValue}</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {new Date(r.createdAt).toLocaleDateString()}
-                </div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>HK${r.hkdValue}</div>
+                <div style={{ fontSize: 11, color: '#8AAD96' }}>{new Date(r.createdAt).toLocaleDateString()}</div>
               </div>
-              <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#dc2626' }}>
-                −{r.pointsDeducted} pts
-              </div>
+              <div style={{ color: '#B91C1C', fontWeight: 600, fontSize: 13 }}>−{r.pointsDeducted} pts</div>
             </div>
           ))}
         </>
