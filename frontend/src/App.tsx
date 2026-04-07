@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { useAuth } from './auth/AuthContext';
 import OnboardingScreen from './screens/OnboardingScreen';
 
@@ -150,6 +151,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <TabBar />
+      <Analytics />
     </>
   );
 }
