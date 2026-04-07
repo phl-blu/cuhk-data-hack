@@ -28,6 +28,13 @@ function getPool(): pg.Pool {
     _pool.on('error', (err) => {
       console.error('[db] Pool error (idle client):', err.message);
     });
+
+    // Keep the pool alive — ping every 4 minutes to prevent Railway Postgres from sleeping
+    setInterval(() => {
+      _pool!.query('SELECT 1').catch((err: Error) => {
+        console.warn('[db] Keepalive ping failed:', err.message);
+      });
+    }, 4 * 60 * 1000);
   }
   return _pool;
 }
