@@ -28,6 +28,8 @@ router.post('/', authMiddleware, async (req, res, next) => {
         accessKeyId: process.env['S3_ACCESS_KEY'] ?? '',
         secretAccessKey: process.env['S3_SECRET_KEY'] ?? '',
       },
+      requestChecksumCalculation: 'WHEN_REQUIRED' as never,
+      responseChecksumValidation: 'WHEN_REQUIRED' as never,
     };
     if (endpoint) {
       clientConfig.endpoint = endpoint;
@@ -41,9 +43,13 @@ router.post('/', authMiddleware, async (req, res, next) => {
       Bucket: bucket,
       Key: key,
       ContentType: 'image/jpeg',
+      ChecksumAlgorithm: undefined,
     });
 
-    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+    const uploadUrl = await getSignedUrl(s3, command, {
+      expiresIn: 300,
+      unhoistableHeaders: new Set(),
+    });
 
     // Build public URL
     const photoUrl = publicBaseUrl
